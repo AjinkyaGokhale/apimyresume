@@ -1,7 +1,7 @@
 {
   "name": "apimyresume",
   "version": "0.2.0",
-  "description": "APIMyResume — KB-driven resume API with Typst native render pipeline",
+  "description": "APIMyResume — a polished resume for every job. Turn one profile into beautiful PDF resumes, tailored with an AI agent, n8n, or Zapier.",
   "type": "module",
   "private": true,
   "scripts": {

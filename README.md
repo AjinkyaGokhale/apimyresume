@@ -1,6 +1,8 @@
 # APIMyResume
 
-**Open-source resume generation API.** Build tailored, job-specific PDF resumes programmatically — connect to n8n, Zapier, or any AI agent to automate your job application workflow.
+**A polished resume for every job.**
+
+Keep one profile and turn it into beautiful, professional PDF resumes — then connect an AI agent, n8n, or Zapier to tailor each one to the job you want.
 
 Create one base resume. Generate unlimited targeted versions per company and role, each rendered as a pixel-perfect PDF via [Typst](https://typst.app).
 
