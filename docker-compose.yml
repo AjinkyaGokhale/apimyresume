@@ -1,0 +1,19 @@
+# APIMyResume — single-command deployment.
+# `docker compose up -d` starts the full app (API + dashboard) on :3000.
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_KEY: ${API_KEY:-amr_local_dev_key}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+    volumes:
+      - apimyresume-data:/data
+      - ./templates:/app/templates
+    restart: unless-stopped
+
+volumes:
+  apimyresume-data:

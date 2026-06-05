@@ -1,0 +1,30 @@
+{
+  "name": "apimyresume",
+  "version": "0.2.0",
+  "description": "APIMyResume — KB-driven resume API with Typst native render pipeline",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "bun run src/db/migrate.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.4.1",
+    "@myriaddreamin/typst-ts-node-compiler": "0.7.0-rc2",
+    "drizzle-orm": "^0.36.4",
+    "hono": "^4.6.14",
+    "nanoid": "^5.0.9",
+    "p-queue": "^8.0.1",
+    "yaml": "^2.6.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "drizzle-kit": "^0.28.1",
+    "typescript": "^5.7.2"
+  }
+}

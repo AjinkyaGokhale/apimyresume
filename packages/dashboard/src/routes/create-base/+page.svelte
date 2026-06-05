@@ -1,0 +1,910 @@
+<script lang="ts">
+  import { goto } from "$app/navigation";
+  import { fade } from "svelte/transition";
+  import { onMount, onDestroy } from "svelte";
+  import YAML from "yaml";
+  import Icon from "$lib/Icon.svelte";
+  import { getApiKey, getApiUrl } from "$lib/api";
+  import type { PageData } from "./$types";
+
+  let { data }: { data: PageData } = $props();
+
+  const editingBase = data.base ?? null;
+
+  let yamlError = $state<string | null>(null);
+  let previewPdfUrl = $state<string>("");
+  let isValidYaml = $state(true);
+  let isCreating = $state(false);
+  let createdId = $state<string | null>(null);
+  let toast = $state<string | null>(null);
+  let isPreviewLoading = $state(false);
+  let lastPreviewData = $state<string>("");
+
+  function baseToYaml(base: NonNullable<typeof editingBase>): string {
+    const doc: Record<string, unknown> = {
+      name: base.name,
+      template: base.template,
+      ...(base.data ?? {}),
+    };
+    return YAML.stringify(doc, { lineWidth: 0 });
+  }
+
+  // Placeholder YAML template - based on stuxf/basic-typst-resume-template
+  let yamlContent = $state(editingBase ? baseToYaml(editingBase) : `# Your resume - edit the values below
+# Name is the display label for this base resume (e.g., "Software Engineer - US", "Full Stack - Europe")
+name: Max Muster - Software Engineer
+template: basic-resume
+
+profile:
+  name: Max Muster
+  title: Software Engineer
+  location: Berlin, Germany
+  email: max@muster.dev
+  phone: +49 30 12345678
+  links:
+    github: github.com/maxmuster
+    linkedin: linkedin.com/in/maxmuster
+    portfolio: muster.dev
+
+education:
+  - institution: Technische Universität Berlin
+    degree: Bachelor of Science, Computer Science
+    location: Berlin, Germany
+    period: Oct 2020 – Sep 2024
+    bullets:
+      - "Cumulative GPA: 1.7/1.0 (German grading) | Dean's List, Deutschlandstipendium Scholarship"
+      - "Relevant Coursework: Algorithms, Distributed Systems, Machine Learning, Software Engineering"
+      - "Thesis: Scalable Distributed Key-Value Store with Consistent Hashing and Replication"
+
+experience:
+  - id: sap-intern
+    role: Software Engineering Intern
+    company: SAP SE
+    location: Walldorf, Germany
+    period: Mar 2024 – Aug 2024
+    bullets:
+      - "Developed microservices handling 5M+ daily requests using Kubernetes and Go"
+      - "Reduced API latency by 35% through Redis caching and query optimization"
+      - "Implemented CI/CD pipelines reducing deployment time from hours to minutes"
+      - "Collaborated with team of 12 engineers in agile sprints, mentored 2 junior developers"
+  - id: fraunhofer-research
+    role: Research Assistant
+    company: Fraunhofer Institute for AI
+    location: Berlin, Germany
+    period: Sep 2023 – Feb 2024
+    bullets:
+      - "Implemented transformer models for NLP achieving 92% F1 score on benchmark dataset"
+      - "Published paper at German AI conference on efficient attention mechanisms"
+      - "Open-sourced PyTorch toolkit with 300+ GitHub stars and 10+ contributors"
+      - "Optimized distributed training pipeline reducing compute time by 25%"
+
+projects:
+  - name: StudySync
+    role: Creator
+    url: studysync.app
+    period: Jan 2023 – Present
+    bullets:
+      - "Open-source study group platform used by 8,000+ students at 10+ universities"
+      - "Built real-time collaboration using WebSockets, PostgreSQL, and Redis pub/sub"
+      - "Implemented OAuth2 authentication with support for Google and GitHub login"
+      - "Deployed on AWS with auto-scaling, achieving 99.9% uptime over 12 months"
+  - name: Berlin Transit Viz
+    role: Creator
+    url: github.com/maxmuster/bvg-viz
+    period: Jun 2024 – Aug 2024
+    bullets:
+      - "Interactive visualization of Berlin public transport using D3.js and Mapbox GL"
+      - "Processes 1M+ daily data points from BVG API in real-time"
+      - "Implemented efficient spatial indexing reducing query latency by 60%"
+      - "Featured in Berlin Tech Weekly newsletter with 5,000+ subscribers"
+
+extracurriculars:
+  - activity: University Programming Contest Team
+    period: Oct 2021 – Present
+    bullets:
+      - "Captain of TU Berlin ICPC team, qualified for regional finals 2023 and 2024"
+      - "Organized weekly practice sessions for 30+ students on advanced algorithms"
+      - "Created 200+ original problems for team training and internal competitions"
+
+skills:
+  - category: Programming Languages
+    items: [Python, TypeScript, Go, Rust, Java, C/C++]
+  - category: Frontend
+    items: [React, Vue.js, Svelte, Tailwind CSS, WebGL]
+  - category: Backend
+    items: [Node.js, FastAPI, GraphQL, PostgreSQL, MongoDB, Redis]
+  - category: Cloud & DevOps
+    items: [Docker, Kubernetes, AWS, Terraform, GitHub Actions, CI/CD]`);
+
+  const pageTitle = $derived(editingBase ? `Edit base — ${editingBase.name}` : "Create base resume");
+  const submitLabel = $derived(editingBase ? "Save changes" : "Create base");
+
+  function showToast(msg: string) {
+    toast = msg;
+    setTimeout(() => (toast = null), 2000);
+  }
+
+  // Robust YAML parser
+  function parseYamlToJson(yaml: string): Record<string, unknown> | null {
+    try {
+      const result: Record<string, unknown> = {};
+      const lines = yaml.split('\n');
+      let currentTop: string | null = null;
+      let currentSub: string | null = null;
+      let currentArray: string | null = null;
+      let currentItem: Record<string, unknown> | null = null;
+      let multiLineKey: string | null = null;
+      let multiLineContent: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        // Skip comments
+        if (trimmed.startsWith('#')) continue;
+        if (!trimmed) {
+          // End of multi-line if blank line
+          if (multiLineKey && currentItem) {
+            currentItem[multiLineKey] = multiLineContent.join('\n');
+            multiLineKey = null;
+            multiLineContent = [];
+          }
+          continue;
+        }
+
+        const indent = line.length - line.trimStart().length;
+
+        // Handle multi-line content
+        if (multiLineKey && currentItem && indent >= 8) {
+          multiLineContent.push(trimmed);
+          continue;
+        }
+
+        // End multi-line if indentation changes
+        if (multiLineKey && currentItem && indent < 8) {
+          currentItem[multiLineKey] = multiLineContent.join('\n');
+          multiLineKey = null;
+          multiLineContent = [];
+        }
+
+        // Top level: template: basic-resume
+        if (indent === 0 && trimmed.includes(':')) {
+          const colonIdx = trimmed.indexOf(':');
+          const key = trimmed.slice(0, colonIdx).trim();
+          const value = trimmed.slice(colonIdx + 1).trim();
+
+          if (value) {
+            // Simple key: value
+            if (value.startsWith('[') && value.endsWith(']')) {
+              // Array literal: [a, b, c]
+              result[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
+            } else {
+              result[key] = value.replace(/^["']|["']$/g, '');
+            }
+            currentTop = null;
+          } else {
+            // Start of section
+            currentTop = key;
+            currentSub = null;
+            currentArray = null;
+            currentItem = null;
+            result[currentTop] = {};
+          }
+          continue;
+        }
+
+        // In section: profile: (indent 2)
+        if (currentTop && indent === 2 && !trimmed.startsWith('-')) {
+          const colonIdx = trimmed.indexOf(':');
+          if (colonIdx > 0) {
+            const key = trimmed.slice(0, colonIdx).trim();
+            const value = trimmed.slice(colonIdx + 1).trim();
+
+            if (currentTop === 'profile') {
+              if (key === 'links') {
+                (result.profile as Record<string, unknown>).links = {};
+                currentSub = 'links';
+              } else if (value) {
+                (result.profile as Record<string, unknown>)[key] = value.replace(/^["']|["']$/g, '');
+                currentSub = null;
+              }
+            } else if (value) {
+              (result[currentTop] as Record<string, unknown>)[key] = value.replace(/^["']|["']$/g, '');
+            }
+          }
+          continue;
+        }
+
+        // In profile.links: linkedin: url (indent 4)
+        if (currentTop === 'profile' && indent === 4 && currentSub === 'links') {
+          const colonIdx = trimmed.indexOf(':');
+          if (colonIdx > 0) {
+            const key = trimmed.slice(0, colonIdx).trim();
+            const value = trimmed.slice(colonIdx + 1).trim();
+            ((result.profile as Record<string, unknown>).links as Record<string, string>)[key] = value.replace(/^["']|["']$/g, '');
+          }
+          continue;
+        }
+
+        // Start of array item: - id: acme (indent 2)
+        if (currentTop && indent === 2 && trimmed.startsWith('- ')) {
+          if (!Array.isArray(result[currentTop])) {
+            result[currentTop] = [];
+          }
+          currentArray = currentTop;
+
+          const rest = trimmed.slice(2).trim();
+          const colonIdx = rest.indexOf(':');
+          currentItem = {};
+          (result[currentTop] as unknown[]).push(currentItem);
+
+          if (colonIdx > 0) {
+            const key = rest.slice(0, colonIdx).trim();
+            const value = rest.slice(colonIdx + 1).trim();
+            currentItem[key] = value.replace(/^["']|["']$/g, '');
+          }
+          continue;
+        }
+
+        // Properties of array items (indent 4 or 6)
+        if (currentArray && currentItem && indent >= 4 && !trimmed.startsWith('-')) {
+          const colonIdx = trimmed.indexOf(':');
+          if (colonIdx > 0) {
+            const key = trimmed.slice(0, colonIdx).trim();
+            const value = trimmed.slice(colonIdx + 1).trim();
+
+            if (value) {
+              if (value.startsWith('[') && value.endsWith(']')) {
+                // Parse [a, b, c] array
+                currentItem[key] = value.slice(1, -1).split(',').map(s => s.trim()).filter(s => s).map(s => s.replace(/^["']|["']$/g, ''));
+              } else {
+                currentItem[key] = value.replace(/^["']|["']$/g, '');
+              }
+            } else {
+              // Could be start of nested bullets
+              currentItem[key] = [];
+            }
+          }
+          continue;
+        }
+
+        // Bullets in array item: - "text" (indent 6 or 8)
+        if (currentArray && currentItem && indent >= 6 && trimmed.startsWith('- ')) {
+          const rest = trimmed.slice(2).trim();
+          // Find which key has an array
+          const item = currentItem as Record<string, unknown>;
+          for (const [key, val] of Object.entries(item)) {
+            if (Array.isArray(val)) {
+              const bulletText = rest.replace(/^["']|["']$/g, '');
+              val.push(bulletText);
+              break;
+            }
+          }
+          continue;
+        }
+      }
+
+      // Clean up any dangling multi-line
+      if (multiLineKey && currentItem) {
+        currentItem[multiLineKey] = multiLineContent.join('\n');
+      }
+
+      return result;
+    } catch (e) {
+      console.error('Parse error:', e);
+      return null;
+    }
+  }
+
+  // Validate-only on input — the PDF render happens only when Compile is clicked.
+  function validateYaml(): Record<string, unknown> | null {
+    const data = parseYamlToJson(yamlContent);
+    if (!data) {
+      yamlError = 'Invalid YAML syntax';
+      isValidYaml = false;
+      return null;
+    }
+
+    const profile = data.profile as Record<string, unknown> | undefined;
+    if (!data.template) {
+      yamlError = 'Missing required field: template';
+      isValidYaml = false;
+      return null;
+    }
+    if (!profile || typeof profile !== 'object') {
+      yamlError = 'Missing required section: profile';
+      isValidYaml = false;
+      return null;
+    }
+    if (!profile.name || !profile.email) {
+      yamlError = 'Missing required profile fields: name or email';
+      isValidYaml = false;
+      return null;
+    }
+    if (!profile.title) {
+      yamlError = 'Missing required profile field: title (e.g., Software Engineer)';
+      isValidYaml = false;
+      return null;
+    }
+
+    yamlError = null;
+    isValidYaml = true;
+    return data;
+  }
+
+  function onInput() {
+    validateYaml();
+  }
+
+  function onKeydown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (isValidYaml && !isPreviewLoading) compile();
+    }
+  }
+
+  async function compile() {
+    const data = validateYaml();
+    if (!data) return;
+
+    isPreviewLoading = true;
+
+    // Avoid re-rendering identical content
+    const dataStr = JSON.stringify(data);
+    if (dataStr === lastPreviewData && previewPdfUrl) {
+      isPreviewLoading = false;
+      return;
+    }
+    lastPreviewData = dataStr;
+
+    try {
+      const response = await fetch(`${getApiUrl()}/api/v1/resumes/preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': getApiKey()
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let err;
+        try { err = JSON.parse(text); } catch { err = { error: text }; }
+        throw new Error(err.error || `Failed to generate preview (${response.status})`);
+      }
+
+      const pdfBlob = await response.blob();
+
+      // Revoke old URL to prevent memory leaks
+      if (previewPdfUrl) {
+        URL.revokeObjectURL(previewPdfUrl);
+      }
+
+      previewPdfUrl = URL.createObjectURL(pdfBlob);
+      // Keep isPreviewLoading true until the iframe's onload fires, so the
+      // loading overlay masks the iframe reload — no white flash of the new PDF.
+    } catch (e) {
+      console.error('Preview error:', e);
+      yamlError = String(e).replace(/^Error: /, '');
+      isValidYaml = false;
+      isPreviewLoading = false;
+    }
+  }
+
+  // Render once automatically when the editor opens; after that it's manual.
+  onMount(() => {
+    void compile();
+  });
+
+  onDestroy(() => {
+    if (previewPdfUrl) {
+      URL.revokeObjectURL(previewPdfUrl);
+    }
+  });
+
+  async function createBase() {
+    const parsed = parseYamlToJson(yamlContent);
+    if (!parsed || !isValidYaml) return;
+
+    const profile = parsed.profile as Record<string, unknown>;
+    if (!profile.title) profile.title = 'Software Engineer';
+
+    isCreating = true;
+    try {
+      let response: Response;
+
+      if (editingBase) {
+        // Update existing base via PATCH
+        response = await fetch(`${getApiUrl()}/api/v1/bases/${editingBase.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() },
+          body: JSON.stringify(parsed),
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to update base');
+        }
+        showToast('Base resume updated');
+        await new Promise(r => setTimeout(r, 800));
+        goto(`/base/${editingBase.id}`);
+        return;
+      }
+
+      // Create new base via POST
+      if (!parsed.id) {
+        const nameSlug = (profile.name as string || 'resume')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        parsed.id = `${nameSlug}-${Date.now().toString(36).slice(-4)}`;
+      }
+      if (Array.isArray(parsed.experience)) {
+        parsed.experience = (parsed.experience as Record<string, unknown>[]).map((exp, idx) => {
+          if (!exp.id) exp.id = `exp-${idx}-${Date.now().toString(36).slice(-4)}`;
+          return exp;
+        });
+      }
+
+      response = await fetch(`${getApiUrl()}/api/v1/bases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': getApiKey() },
+        body: JSON.stringify(parsed),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create base');
+      }
+
+      const result = await response.json();
+      createdId = result.id;
+      showToast('Base resume created');
+    } catch (e) {
+      yamlError = String(e);
+    } finally {
+      isCreating = false;
+    }
+  }
+
+  function goBack() {
+    goto('/');
+  }
+
+  function goHome() {
+    createdId = null;
+    goto('/');
+  }
+</script>
+
+<div class="detail">
+  {#if toast}
+    <div class="toast"><Icon name="check" size={16} />{toast}</div>
+  {/if}
+
+  {#if createdId}
+    <!-- Handoff screen -->
+    <header class="detail-head">
+      <button class="btn back" onclick={goHome}>
+        <Icon name="chevron-left" size={16} /> Back
+      </button>
+      <div class="detail-title">
+        <span class="t-company">Base resume created!</span>
+        <span class="t-role">Your canonical profile is ready</span>
+      </div>
+      <div class="detail-actions">
+        <button class="btn primary" onclick={goHome}>
+          <Icon name="check" size={15} /> Done
+        </button>
+      </div>
+    </header>
+
+    <div class="detail-body single">
+      <div class="handoff-content">
+        <div class="handoff-section">
+          <div class="handoff-label">Base resume ID</div>
+          <code class="handoff-code">{createdId}</code>
+        </div>
+        <div class="handoff-section">
+          <div class="handoff-label">API endpoint</div>
+          <code class="handoff-code">POST {getApiUrl()}/api/v1/resumes</code>
+        </div>
+        <div class="handoff-hint">
+          Your base is ready. Create tailored resumes via the dashboard or API.
+        </div>
+      </div>
+    </div>
+  {:else}
+    <!-- Create base wizard -->
+    <header class="detail-head">
+      <button class="btn back" onclick={goBack}>
+        <Icon name="chevron-left" size={16} /> Back
+      </button>
+      <div class="detail-title">
+        <span class="t-company">{pageTitle}</span>
+        <span class="t-role">Your canonical profile</span>
+      </div>
+      <div class="detail-actions">
+        <button class="btn primary" onclick={createBase} disabled={isCreating || !isValidYaml}>
+          {#if isCreating}
+            <span class="spin"><Icon name="refresh" size={15} /></span> {editingBase ? "Saving…" : "Creating…"}
+          {:else}
+            <Icon name="check" size={15} /> {submitLabel}
+          {/if}
+        </button>
+      </div>
+    </header>
+
+    <div class="detail-body">
+      <aside class="diff-pane">
+        <div class="pane-head">
+          <span class="label">Base YAML</span>
+          <div class="pane-head-right">
+            {#if yamlError}
+              <span class="label error" title={yamlError}>{yamlError.length > 36 ? yamlError.slice(0, 36) + '…' : yamlError}</span>
+            {:else}
+              <span class="label ok">Valid</span>
+            {/if}
+            <button
+              class="btn primary compile"
+              onclick={compile}
+              disabled={!isValidYaml || isPreviewLoading}
+              title="Compile preview (⌘/Ctrl + Enter)"
+            >
+              {#if isPreviewLoading}
+                <span class="spin"><Icon name="refresh" size={13} /></span> Compiling…
+              {:else}
+                <Icon name="braces" size={13} /> Compile
+              {/if}
+            </button>
+          </div>
+        </div>
+        <textarea
+          class="yaml-editor"
+          bind:value={yamlContent}
+          oninput={onInput}
+          onkeydown={onKeydown}
+          spellcheck="false"
+        ></textarea>
+      </aside>
+      <section class="pdf-pane">
+        <div class="pane-head">
+          <span class="label">Preview</span>
+          {#if isPreviewLoading}
+            <span class="label loading">
+              <span class="spin-inline"><Icon name="refresh" size={12} /></span>
+              Compiling…
+            </span>
+          {/if}
+        </div>
+        <div class="pdf-stage">
+          {#if previewPdfUrl}
+            <iframe
+              class="pdf-frame"
+              src={previewPdfUrl}
+              title="Resume Preview"
+              onload={() => (isPreviewLoading = false)}
+            ></iframe>
+          {/if}
+          {#if isPreviewLoading || !previewPdfUrl}
+            <div
+              class="preview-placeholder"
+              class:error={Boolean(yamlError) && !previewPdfUrl}
+              out:fade={{ duration: 200 }}
+            >
+              {#if isPreviewLoading}
+                <span class="spin"><Icon name="refresh" size={34} /></span>
+                <span>Compiling…</span>
+              {:else if yamlError && !previewPdfUrl}
+                <Icon name="alert" size={48} />
+                <span>{yamlError}</span>
+              {:else}
+                <Icon name="braces" size={44} />
+                <span>Press <strong>Compile</strong> to render the preview</span>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      </section>
+    </div>
+  {/if}
+</div>
+
+<style>
+  .detail {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--canvas);
+  }
+
+  .detail-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .btn.back {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .detail-title {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+  }
+
+  .detail-title .t-company {
+    font-weight: 600;
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .detail-title .t-role {
+    font-size: 12.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .detail-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .detail-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    min-height: 0;
+  }
+
+  .detail-body.single {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 48px 24px;
+  }
+
+  .diff-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--border);
+  }
+
+  .pdf-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--canvas);
+  }
+
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    min-height: 42px;
+  }
+
+  .pane-head-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .btn.compile {
+    padding: 5px 11px;
+    font-size: 12.5px;
+  }
+
+  .pane-head .label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  .pane-head .label.error {
+    color: var(--badge-red-text);
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pane-head .label.ok {
+    color: var(--badge-green-text);
+  }
+
+  .pane-head .label.loading {
+    color: var(--text-soft);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .yaml-editor {
+    flex: 1;
+    padding: 16px;
+    border: none;
+    background: var(--surface);
+    color: var(--code);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    resize: none;
+    outline: none;
+    tab-size: 2;
+  }
+
+  .yaml-editor:focus {
+    background: var(--surface);
+  }
+
+  .pdf-stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .pdf-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--surface);
+  }
+
+  .preview-placeholder {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--surface);
+    color: var(--muted);
+    text-align: center;
+    padding: 32px;
+  }
+
+  .preview-placeholder .spin {
+    color: var(--accent);
+  }
+
+  .preview-placeholder.error {
+    color: var(--badge-red-text);
+  }
+
+  .handoff-content {
+    width: 100%;
+    max-width: 600px;
+  }
+
+  .handoff-section {
+    margin-bottom: 24px;
+  }
+
+  .handoff-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .handoff-code {
+    display: block;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--code);
+    word-break: break-all;
+  }
+
+  .handoff-hint {
+    color: var(--text-soft);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-top: 32px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--text);
+    color: var(--canvas);
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    z-index: 60;
+  }
+
+  .spin {
+    animation: spin 0.8s linear infinite;
+    display: inline-flex;
+  }
+
+  .spin-inline {
+    animation: spin 0.8s linear infinite;
+    display: inline-flex;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+</style>
