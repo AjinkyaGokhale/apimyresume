@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Runtime data (DB, API keys, PDFs) — never commit
+data/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Secrets
+.env
+.env.local
+
+# Build output
+dist/
+packages/dashboard/build/
+packages/dashboard/.svelte-kit/
+
+# Internal dev docs
+docs/

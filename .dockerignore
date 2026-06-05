@@ -1,0 +1,11 @@
+node_modules/
+packages/api/node_modules/
+packages/dashboard/node_modules/
+packages/dashboard/.svelte-kit/
+packages/dashboard/build/
+data/
+docs/
+*.log
+.DS_Store
+.env
+packages/dashboard/.env
