@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --port 4321",
     "start": "node build",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",

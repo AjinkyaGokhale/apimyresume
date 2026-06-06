@@ -17,6 +17,8 @@ COPY --from=ghcr.io/typst/typst:0.14.2 /bin/typst /usr/local/bin/typst
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
        wget \
+       ca-certificates \
+       fontconfig \
        fonts-dejavu-core \
        fonts-liberation \
        fonts-crosextra-carlito \
