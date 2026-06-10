@@ -62,6 +62,8 @@ export const resumes = sqliteTable(
 export const apiKeys = sqliteTable("api_keys", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  /** Owning user. Nullable so legacy/env-only keys remain valid. */
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   /** SHA-256 hex digest of the raw key — never store plaintext. */
   hash: text("hash").notNull().unique(),
   /** First 16 chars of the raw key for safe display (e.g. "amr_live_AbCdEf…"). */
@@ -71,8 +73,35 @@ export const apiKeys = sqliteTable("api_keys", {
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
 });
 
+/** The single owner account for a self-hosted instance. */
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  /** scrypt hash (Bun.password) — never store plaintext. */
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
+/** Browser session for the dashboard (httpOnly cookie holds the id). */
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
 export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type NewApiKeyRow = typeof apiKeys.$inferInsert;
+export type UserRow = typeof users.$inferSelect;
+export type NewUserRow = typeof users.$inferInsert;
+export type SessionRow = typeof sessions.$inferSelect;
+export type NewSessionRow = typeof sessions.$inferInsert;
 
 export type BaseRow = typeof bases.$inferSelect;
 export type NewBaseRow = typeof bases.$inferInsert;

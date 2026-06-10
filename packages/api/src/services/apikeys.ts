@@ -30,24 +30,28 @@ export interface ApiKeyCreated extends ApiKeyPublic {
   key: string;
 }
 
-export function listApiKeys(): ApiKeyPublic[] {
-  return db
+export function listApiKeys(userId?: string): ApiKeyPublic[] {
+  // userId filter is optional — single-owner deployments pass nothing and get
+  // every key, matching the previous behaviour.
+  const q = db
     .select({
       id: apiKeys.id,
       name: apiKeys.name,
       prefix: apiKeys.prefix,
       createdAt: apiKeys.createdAt,
     })
-    .from(apiKeys)
-    .all();
+    .from(apiKeys);
+  const rows = userId ? q.where(eq(apiKeys.userId, userId)).all() : q.all();
+  return rows;
 }
 
-export function createApiKey(name: string): ApiKeyCreated {
+export function createApiKey(name: string, userId?: string): ApiKeyCreated {
   const raw = generateRaw();
   const id = nanoid(12);
   const row = {
     id,
     name: name.trim(),
+    userId: userId ?? null,
     hash: sha256(raw),
     prefix: makePrefix(raw),
   };

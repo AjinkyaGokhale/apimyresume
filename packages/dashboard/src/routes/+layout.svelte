@@ -1,6 +1,8 @@
 <script lang="ts">
   import "../app.css";
+  import { invalidateAll, goto } from "$app/navigation";
   import { page } from "$app/stores";
+  import { authLogout } from "$lib/auth";
   import Icon from "$lib/Icon.svelte";
   import NavLoader from "$lib/NavLoader.svelte";
   import type { Snippet } from "svelte";
@@ -10,6 +12,16 @@
 
   let navOpen = $state(false);
   const close = () => (navOpen = false);
+
+  async function signOut() {
+    try {
+      await authLogout();
+    } catch {
+      // best effort
+    }
+    await invalidateAll();
+    await goto("/login", { replaceState: true });
+  }
 
   // Editor pages expand flush to fill the main content area (no padding, no max-width).
   const editor = $derived(
@@ -22,6 +34,9 @@
   const onResumes = $derived($page.url.pathname === "/" || $page.url.pathname.startsWith("/base/"));
   const onDocs = $derived($page.url.pathname === "/docs");
   const onApiKeys = $derived($page.url.pathname === "/api-keys");
+  const isAuthPage = $derived($page.url.pathname === "/login" || $page.url.pathname === "/setup");
+  // Auth pages render the slot naked (no sidebar, no top bar).
+  const showShell = $derived(!isAuthPage);
   // Pages that render inside the centered, max-width content column.
   // NB: written as an explicit branch rather than `(onResumes || onDocs) && !editor`
   // because the Svelte compiler drops the outer parens, which flips the meaning to
@@ -48,7 +63,8 @@
 
 <NavLoader />
 
-<div class="app">
+{#if showShell}
+  <div class="app">
     <!-- Mobile top bar -->
     <header class="topbar">
       <button class="icon-btn" aria-label="Open menu" onclick={() => (navOpen = true)}>
@@ -89,6 +105,10 @@
       {/each}
 
       <div class="nav-spacer"></div>
+      <button class="nav-item sign-out" type="button" onclick={signOut} aria-label="Sign out">
+        <Icon name="log-out" size={17} />
+        <span class="label">Sign out</span>
+      </button>
       <div class="credits">Built with <Icon name="heart" size={14} /> by <span>Ajinkya Gokhale</span></div>
     </aside>
 
@@ -96,6 +116,9 @@
       {@render children()}
     </main>
   </div>
+{:else}
+  {@render children()}
+{/if}
 
 <style>
   .credits {
@@ -118,5 +141,19 @@
   .credits :global(.icon) {
     color: var(--text);
     flex-shrink: 0;
+  }
+
+  .sign-out {
+    background: transparent;
+    border: none;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    color: var(--text-soft);
+    margin-top: 2px;
+  }
+  .sign-out:hover {
+    background: var(--surface-2);
+    color: var(--text);
   }
 </style>
