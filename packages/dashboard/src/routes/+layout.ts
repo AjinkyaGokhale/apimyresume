@@ -1,6 +1,7 @@
 // dashboard/src/routes/+layout.ts
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
+import { listResumes } from "$lib/api";
 import { authState, authMe } from "$lib/auth";
 import type { LayoutLoad } from "./$types";
 
@@ -45,7 +46,15 @@ export const load: LayoutLoad = async ({ url }) => {
     // Verify with /me so the layout data carries the username.
     try {
       const me = await authMe();
-      return { apiDown, total: 0, authed: true, needsSetup, isAuthPage, username: me.username };
+      // Sidebar resume count — best effort, the shell renders fine without it.
+      let total = 0;
+      try {
+        const { pagination } = await listResumes({ limit: 1 });
+        total = pagination.total;
+      } catch {
+        /* count stays 0 */
+      }
+      return { apiDown, total, authed: true, needsSetup, isAuthPage, username: me.username };
     } catch {
       // Session expired between /state and /me — treat as logged out.
       void goto(`/login?next=${encodeURIComponent(path)}`, { replaceState: true });

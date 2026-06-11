@@ -1,7 +1,6 @@
 <script lang="ts">
   import YAML from "yaml";
   import Icon from "$lib/Icon.svelte";
-  import ThemeToggle from "$lib/ThemeToggle.svelte";
   import { getApiKey, getApiUrl } from "$lib/api";
   import type { ResumeDto } from "$lib/types";
   import type { PageData } from "./$types";
@@ -73,9 +72,9 @@
 
     previewLoading = true;
     try {
-      const res = await fetch(`/base/${r.base_id}/new/preview`, {
+      const res = await fetch(`${getApiUrl()}/api/v1/resumes/preview`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": getApiKey() },
         body: JSON.stringify({ ...buildPatchPayload(parsed), base_id: r.base_id }),
       });
       if (!res.ok) {
@@ -172,7 +171,6 @@
       <span class="t-role">{r.role ?? r.template} · base: {r.base_id}</span>
     </div>
     <div class="detail-actions">
-      <ThemeToggle variant="icon" />
       <button class="btn" onclick={saveAndRegenerate} disabled={saving || !isValidYaml}>
         {#if saving}
           <span class="spin"><Icon name="refresh" size={15} /></span> Saving…

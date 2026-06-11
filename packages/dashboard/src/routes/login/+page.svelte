@@ -1,11 +1,14 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
+  import { fade } from "svelte/transition";
   import { authLogin, authState } from "$lib/auth";
+  import Icon from "$lib/Icon.svelte";
 
   let username = $state("");
   let password = $state("");
   let submitting = $state(false);
+  let redirecting = $state(false);
   let error = $state<string | null>(null);
 
   // If the instance still needs setup, bounce to /setup.
@@ -29,23 +32,32 @@
     submitting = true;
     try {
       await authLogin(username.trim(), password);
+      // Hold a loading overlay through the dashboard's data load — the layout
+      // and home `load` make several API calls before the page can render.
+      redirecting = true;
       const next = $page.url.searchParams.get("next") || "/";
       await goto(next, { replaceState: true });
     } catch (e) {
       error = e instanceof Error ? e.message : "Login failed";
-    } finally {
       submitting = false;
+      redirecting = false;
     }
   }
 </script>
 
+{#if redirecting}
+  <div class="auth-loading" transition:fade={{ duration: 150 }} role="status" aria-live="polite">
+    <span class="spinner"><Icon name="refresh" size={28} /></span>
+    <span class="msg">Signing you in…</span>
+  </div>
+{/if}
+
 <div class="auth-page">
+  <div class="brand">
+    <img class="brand-logo" src="/logo/logo-apimyresume.png" alt="apimyresume" />
+  </div>
   <div class="auth-card">
-    <div class="brand">
-      <span class="brand-name">apimyresume</span>
-    </div>
     <h1>Sign in</h1>
-    <p class="hint">Welcome back. Sign in to manage your resumes and API keys.</p>
 
     <form onsubmit={submit}>
       <label class="form-label" for="username">Username</label>
@@ -89,11 +101,47 @@
   .auth-page {
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 24px;
+    background: var(--canvas);
+    padding: 12vh 24px 24px;
+    box-sizing: border-box;
+  }
+  /* Full-screen overlay shown after auth succeeds, while the dashboard's
+     load functions fetch data — masks the gap so the swap feels intentional. */
+  .auth-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 14px;
     background: var(--canvas);
-    padding: 24px;
-    box-sizing: border-box;
+    color: var(--muted);
+  }
+  .auth-loading .spinner {
+    display: inline-flex;
+    color: var(--accent);
+    animation: auth-spin 0.8s linear infinite;
+  }
+  .auth-loading .msg {
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  @keyframes auth-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .auth-loading .spinner {
+      animation: none;
+    }
   }
   .auth-card {
     width: 100%;
@@ -106,24 +154,18 @@
     box-sizing: border-box;
   }
   .brand {
-    margin-bottom: 18px;
+    margin-bottom: 0;
   }
-  .brand-name {
-    font-family: "Figtree", system-ui, sans-serif;
-    font-weight: 600;
-    font-size: 18px;
-    color: var(--text);
+  .brand-logo {
+    height: 38px;
+    width: auto;
+    display: block;
   }
   h1 {
     font-size: 22px;
     font-weight: 600;
     margin: 0 0 6px 0;
     color: var(--text);
-  }
-  .hint {
-    font-size: 13px;
-    color: var(--muted);
-    margin: 0 0 22px 0;
   }
   form {
     display: flex;

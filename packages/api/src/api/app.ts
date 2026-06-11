@@ -46,7 +46,7 @@ export function createApp() {
 
   // --- CORS for dashboard development ---
   app.use("*", cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["http://localhost:4321", "http://localhost:5173", "http://localhost:5174"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
     credentials: true,
@@ -86,6 +86,8 @@ export function createApp() {
   // --- Dashboard static file serving ---
   app.use("/_app/*", serveStatic({ root: config.dashboardDir }));
   app.use("/favicon*", serveStatic({ root: config.dashboardDir }));
+  // Static assets copied verbatim from the dashboard's `static/` dir (logo, etc.).
+  app.use("/logo/*", serveStatic({ root: config.dashboardDir }));
 
   // SPA fallback: serve index.html with bootstrapped config for all non-API routes
   app.get("*", async (c) => {

@@ -2,7 +2,6 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { createApiKey } from "../../services/apikeys.ts";
 import { conflict, unauthorized } from "../../lib/errors.ts";
 import {
   createOwner,
@@ -22,7 +21,7 @@ import {
 /**
  * Owner authentication (setup, login, logout, me, state).
  *  - GET  /auth/state  — public. Tells the dashboard whether to show /setup or /login.
- *  - POST /auth/setup  — public. 409 if an owner already exists. Mints a default API key.
+ *  - POST /auth/setup  — public. 409 if an owner already exists. Creates the owner + session.
  *  - POST /auth/login  — public. Sets the session cookie.
  *  - POST /auth/logout — public. Clears the session cookie.
  *  - GET  /auth/me     — session-only. Returns the current owner.
@@ -72,16 +71,9 @@ authRouter.post("/setup", zValidator("json", credsSchema), async (c) => {
   const { username, password } = c.req.valid("json");
   const user = await createOwner(username, password);
   const session = createSession(user.id);
-  const apiKey = createApiKey("default", user.id);
 
   setSessionCookie(c, session.id);
-  return c.json(
-    {
-      username: user.username,
-      api_key: apiKey.key,
-    },
-    201,
-  );
+  return c.json({ username: user.username }, 201);
 });
 
 authRouter.post("/login", zValidator("json", credsSchema), async (c) => {

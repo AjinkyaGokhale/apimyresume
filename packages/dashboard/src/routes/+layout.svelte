@@ -57,7 +57,7 @@
 
 {#snippet brand()}
   <div class="brand">
-    <span class="brand-name">apimyresume</span>
+    <img class="brand-logo" src="/logo/logo-apimyresume.png" alt="apimyresume" />
   </div>
 {/snippet}
 

@@ -31,7 +31,7 @@ async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const authState = () => send<AuthState>("/auth/state");
 export const authMe = () => send<{ username: string }>("/auth/me");
 export const authSetup = (username: string, password: string) =>
-  send<{ username: string; api_key: string }>("/auth/setup", {
+  send<{ username: string }>("/auth/setup", {
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
