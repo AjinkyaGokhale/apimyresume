@@ -1,6 +1,5 @@
-/* apimyresume dashboard — n8n-inspired UI with light + dark themes.
-   Light: off-white canvas, white surfaces, coral accent.
-   Dark:  deep slate canvas, raised surfaces, same coral accent. */
+/* apimyresume dashboard — n8n-inspired UI, dark mode only.
+   Deep slate canvas, raised surfaces, monochrome graphite accent. */
 
 /* Wordmark display font. "Embolism Spark" is not a Google Font, so it is
    self-hosted: drop the file at dashboard/static/fonts/embolism-spark.woff2
@@ -14,47 +13,7 @@
 }
 
 :root {
-  --canvas: #f4f4f6;
-  --surface: #ffffff;
-  --surface-2: #f6f6f8;
-  --surface-3: #eeeef1;
-  --border: #e3e3e8;
-  --border-strong: #d4d4da;
-  --text: #2a2a36;
-  --text-soft: #55555f;
-  --muted: #8a8a96;
-
-  /* Graphite — monochrome only. The "accent" is just the foreground graphite. */
-  --accent: #1d1d22;
-  --accent-hover: #000000;
-  --accent-contrast: #ffffff;
-  --accent-soft: #ececef;
-  --accent-grad: linear-gradient(135deg, #34343c 0%, #121216 100%);
-  --success: #15803d;
-  --danger: #b91c1c;
-  --surface-alt: #ffffff;
-  --divider: #ececef;
-  --code: #374151;
-  --badge-green-bg: #dcfce7;
-  --badge-green-text: #15803d;
-  --badge-red-bg: #fee2e2;
-  --badge-red-text: #b91c1c;
-
-  --radius: 10px;
-  --radius-sm: 8px;
-  --shadow-sm: 0 1px 2px rgba(24, 24, 40, 0.06);
-  --shadow: 0 2px 8px rgba(24, 24, 40, 0.08);
-  --shadow-lg: 0 18px 50px rgba(15, 15, 25, 0.28);
-  --shadow-xl: 0 25px 60px rgba(15, 15, 25, 0.35);
-
-  --sidebar-w: 248px;
-  --font: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  color-scheme: light;
-}
-
-:root[data-theme="dark"] {
-  /* Provided dark palette. */
+  /* Dark palette — the only theme. */
   --canvas: #0f0f0f; /* bg.primary */
   --surface: #1e1e1e; /* bg.card — cards, modals, stat bar, panes */
   --surface-alt: #1a1a1a; /* bg.secondary — sidebar / top bar */
@@ -68,6 +27,7 @@
   --muted: #9ca3af; /* text.muted */
   --code: #e5e7eb; /* text.code */
 
+  /* Graphite — monochrome only. The "accent" is just the foreground. */
   --accent: #ffffff;
   --accent-hover: #ffffff;
   --accent-contrast: #0f0f0f;
@@ -81,10 +41,16 @@
   --badge-red-bg: #450a0a;
   --badge-red-text: #f87171;
 
+  --radius: 10px;
+  --radius-sm: 8px;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.46);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.62);
   --shadow-xl: 0 25px 60px rgba(0, 0, 0, 0.7);
+
+  --sidebar-w: 248px;
+  --font: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   color-scheme: dark;
 }
 
@@ -184,13 +150,10 @@ button {
   gap: 10px;
   padding: 8px 8px 16px;
 }
-.brand-name {
-  font-family: "Embolism Spark", "Acme", var(--font);
-  font-weight: 400;
-  font-size: 28px;
-  letter-spacing: 0.3px;
-  text-transform: lowercase;
-  color: var(--text);
+.brand-logo {
+  height: 26px;
+  width: auto;
+  display: block;
 }
 .nav-section {
   margin-top: 14px;

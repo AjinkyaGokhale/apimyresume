@@ -65,11 +65,39 @@ export function migrate(): void {
   `);
 
   sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      username      TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+  `);
+
+  sqlite.exec(`
     CREATE TABLE IF NOT EXISTS api_keys (
       id         TEXT PRIMARY KEY,
       name       TEXT NOT NULL,
+      user_id    TEXT REFERENCES users(id) ON DELETE CASCADE,
       hash       TEXT NOT NULL UNIQUE,
       prefix     TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+  `);
+
+  // Upgrade path: databases created before owner auth have api_keys without
+  // user_id, and CREATE TABLE IF NOT EXISTS above is a no-op for them.
+  const apiKeyCols = sqlite
+    .query("PRAGMA table_info(api_keys)")
+    .all() as Array<{ name: string }>;
+  if (!apiKeyCols.some((c) => c.name === "user_id")) {
+    sqlite.exec("ALTER TABLE api_keys ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE;");
+  }
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id         TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
   `);

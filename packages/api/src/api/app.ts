@@ -5,7 +5,6 @@ import { cors } from "hono/cors";
 import { serveStatic } from "hono/bun";
 import { ZodError } from "zod";
 import { config } from "../config.ts";
-import { getApiKey } from "../lib/apikey.ts";
 import { AppError } from "../lib/errors.ts";
 import { log } from "../lib/log.ts";
 import { apiKeyAuth } from "./middleware/auth.ts";
@@ -15,16 +14,23 @@ import { resumes } from "./routes/resumes.ts";
 import { templates } from "./routes/templates.ts";
 import { misc } from "./routes/misc.ts";
 import { apiKeysRouter } from "./routes/apikeys.ts";
+import { authRouter } from "./routes/auth.ts";
 
 /**
- * Hono application (spec §1, §18, §19). Wires the v1 API behind API-key auth and
- * per-key rate limiting, serves PDFs publicly, and maps every thrown error to
- * the consistent { error, code, ... } envelope.
+ * Hono application (spec §1, §18, §19). Wires the v1 API behind API-key auth
+ * (or session-cookie auth for the dashboard) and per-key rate limiting, serves
+ * PDFs publicly, and maps every thrown error to the consistent envelope.
  */
 
-/** Paths reachable without an API key (spec §18). */
+/** Paths reachable without auth (spec §18). */
 function isPublic(method: string, p: string): boolean {
   if (p.startsWith("/pdfs/")) return true;
+  if (p === "/api/v1/auth/state") return true;
+  // Login / setup / logout endpoints are POST and must be reachable without
+  // an existing session — otherwise no one could ever authenticate.
+  if (p === "/api/v1/auth/setup" && method === "POST") return true;
+  if (p === "/api/v1/auth/login" && method === "POST") return true;
+  if (p === "/api/v1/auth/logout" && method === "POST") return true;
   if (method !== "GET") return false;
   if (p === "/api/v1/health" || p === "/api/v1/schema") return true;
   if (/^\/api\/v1\/templates\/[^/]+\/thumbnail$/.test(p)) return true;
@@ -40,7 +46,7 @@ export function createApp() {
 
   // --- CORS for dashboard development ---
   app.use("*", cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: ["http://localhost:4321", "http://localhost:5173", "http://localhost:5174"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
     credentials: true,
@@ -70,6 +76,7 @@ export function createApp() {
 
   const v1 = new Hono();
   v1.route("/", misc);
+  v1.route("/auth", authRouter);
   v1.route("/templates", templates);
   v1.route("/bases", bases);
   v1.route("/resumes", resumes);
@@ -79,6 +86,8 @@ export function createApp() {
   // --- Dashboard static file serving ---
   app.use("/_app/*", serveStatic({ root: config.dashboardDir }));
   app.use("/favicon*", serveStatic({ root: config.dashboardDir }));
+  // Static assets copied verbatim from the dashboard's `static/` dir (logo, etc.).
+  app.use("/logo/*", serveStatic({ root: config.dashboardDir }));
 
   // SPA fallback: serve index.html with bootstrapped config for all non-API routes
   app.get("*", async (c) => {
@@ -92,7 +101,7 @@ export function createApp() {
       return c.text("Dashboard not built. Run `bun run build` in the dashboard directory.", 503);
     }
 
-    const bootstrap = `<script>window.__BOOTSTRAP__=${JSON.stringify({ apiKey: getApiKey(), apiUrl: "" })}</script>`;
+    const bootstrap = `<script>window.__BOOTSTRAP__=${JSON.stringify({ apiKey: "", apiUrl: "" })}</script>`;
     const injected = html.replace("</head>", `${bootstrap}</head>`);
     return c.html(injected);
   });

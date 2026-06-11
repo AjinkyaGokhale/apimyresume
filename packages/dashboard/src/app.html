@@ -10,11 +10,8 @@
       content="Keep one profile and turn it into beautiful, professional PDF resumes — then tailor each one to the job you want with an AI agent, n8n, or Zapier."
     />
     <script>
-      // Set theme before first paint to avoid a flash of the wrong theme.
-      try {
-        const t = localStorage.getItem("theme") || "dark";
-        document.documentElement.dataset.theme = t;
-      } catch (e) {}
+      // Dark mode only — pin it before first paint so there's no flash.
+      document.documentElement.dataset.theme = "dark";
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -28,6 +28,9 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${getApiUrl()}/api/v1${path}`, {
       ...init,
+      // Ride the httpOnly session cookie alongside the optional API key —
+      // required for the dev server, which runs on a different origin.
+      credentials: "include",
       headers: { "X-API-Key": getApiKey(), ...(init.headers ?? {}) },
     });
   } catch (err) {

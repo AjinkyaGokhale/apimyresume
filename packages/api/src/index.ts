@@ -1,6 +1,7 @@
 import { config } from "./config.ts";
 import { log } from "./lib/log.ts";
 import { loadApiKey } from "./lib/apikey.ts";
+import { purgeExpiredSessions } from "./lib/auth.ts";
 import { migrate } from "./db/migrate.ts";
 import { templateRegistry } from "./templates/registry.ts";
 import { workerPool } from "./render/index.ts";
@@ -16,6 +17,7 @@ function boot() {
 
   loadApiKey(); // generate + persist on first start, then log once
   migrate(); // create tables + FTS index
+  purgeExpiredSessions(); // drop stale dashboard sessions
   getStorage(); // instantiate storage driver once
   templateRegistry.load(); // scan /templates
   templateRegistry.startWatching(); // hot-reload in development
