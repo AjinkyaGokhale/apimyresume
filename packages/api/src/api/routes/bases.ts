@@ -28,7 +28,8 @@ bases.post("/", ownerOnly, async (c) => {
 
 bases.get("/:id", (c) => c.json(baseDto(getBase(c.req.param("id")))));
 
-// Public (no API key) — the rendered base resume itself, used as the folder preview.
+// Authenticated (owner session via dashboard <img>, or API key) — the rendered
+// base resume itself, used as the folder preview. Personal data, so not public.
 bases.get("/:id/thumbnail.svg", async (c) => {
   const svg = await baseThumbnail(c.req.param("id"));
   c.header("Content-Type", "image/svg+xml");

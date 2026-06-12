@@ -58,7 +58,8 @@ resumes.delete("/:id", async (c) => {
   return c.body(null, 204);
 });
 
-// Public (no API key) — the rendered resume itself, used as the card thumbnail.
+// Authenticated (owner session via dashboard <img>, or API key) — the rendered
+// resume itself, used as the card thumbnail. Personal data, so not public.
 resumes.get("/:id/thumbnail.svg", async (c) => {
   const svg = await resumeThumbnail(c.req.param("id"));
   c.header("Content-Type", "image/svg+xml");

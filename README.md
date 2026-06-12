@@ -67,10 +67,11 @@ with `TRUST_PROXY=true`.
 - **Brute-force protection** — owner login/setup are throttled per client IP
   (`LOGIN_RATE_LIMIT`, default 10 / 15 min); the API is rate-limited per key
   (`RATE_LIMIT_PER_MINUTE`, default 120; `0` disables).
-- **Public PDF links** — `/pdfs/*.pdf` URLs need no auth so they can be shared,
-  but filenames carry ~70 bits of random entropy, so they're effectively
-  unguessable. Treat a PDF URL as a secret (a capability link); use `s3` storage
-  with presigned/expiring URLs if you need stricter control.
+- **PDFs are private** — rendered resumes (`/pdfs/*.pdf`) and the resume/base
+  thumbnail SVGs are personal data and require auth: the owner session (sent
+  automatically by the dashboard) or an `X-API-Key` header. They are not openly
+  accessible. To hand a single PDF to someone without an account, use `s3`
+  storage and generate a presigned/expiring URL.
 - **CORS** — the dashboard is same-origin and needs no config. Allow external
   browser clients with `ALLOWED_ORIGINS=https://your-domain` (comma-separated).
 
@@ -121,7 +122,8 @@ Two tiers of access, by design:
   for API keys.
 
 API requests send an `X-API-Key` header; the dashboard authenticates with the owner
-session cookie. Public PDF downloads require no auth.
+session cookie. Rendered PDFs are personal data and require either — they are not
+openly downloadable.
 
 ### Create a base resume (owner / dashboard)
 
@@ -176,8 +178,10 @@ PDF version).
 
 ### Download the PDF
 
+PDFs require auth (owner session or API key) — they are not openly accessible:
+
 ```bash
-curl http://localhost:3000/pdfs/resume_xxx_v1.pdf -o resume.pdf
+curl http://localhost:3000/pdfs/resume_xxx_v1.pdf -H "X-API-Key: your-key" -o resume.pdf
 ```
 
 ### Full schema reference

@@ -22,12 +22,18 @@ import { authRouter } from "./routes/auth.ts";
 /**
  * Hono application (spec §1, §18, §19). Wires the v1 API behind API-key auth
  * (or session-cookie auth for the dashboard) and per-key rate limiting, serves
- * PDFs publicly, and maps every thrown error to the consistent envelope.
+ * rendered PDFs to authenticated callers only, and maps every thrown error to
+ * the consistent envelope.
  */
 
-/** Paths reachable without auth (spec §18). */
+/**
+ * Paths reachable without auth (spec §18). Personal content is NOT public:
+ * rendered PDFs and the resume/base thumbnail SVGs (which embed the resume
+ * itself) require the owner session or an API key. Only non-personal assets —
+ * health, schema discovery, auth bootstrap, and the static template-preview
+ * thumbnails — are open.
+ */
 function isPublic(method: string, p: string): boolean {
-  if (p.startsWith("/pdfs/")) return true;
   if (p === "/api/v1/auth/state") return true;
   // Login / setup / logout endpoints are POST and must be reachable without
   // an existing session — otherwise no one could ever authenticate.
@@ -36,11 +42,8 @@ function isPublic(method: string, p: string): boolean {
   if (p === "/api/v1/auth/logout" && method === "POST") return true;
   if (method !== "GET") return false;
   if (p === "/api/v1/health" || p === "/api/v1/schema") return true;
+  // Static template-preview images (design previews, not user data).
   if (/^\/api\/v1\/templates\/[^/]+\/thumbnail$/.test(p)) return true;
-  // Rendered resume thumbnail (SVG) — embedded as <img> in the dashboard.
-  if (/^\/api\/v1\/resumes\/[^/]+\/thumbnail\.svg$/.test(p)) return true;
-  // Rendered base-resume thumbnail (SVG) — folder preview in the dashboard.
-  if (/^\/api\/v1\/bases\/[^/]+\/thumbnail\.svg$/.test(p)) return true;
   return false;
 }
 
@@ -68,7 +71,10 @@ export function createApp() {
     credentials: true,
   }));
 
-  // --- Public static PDF serving (spec §18: no auth for PDF files). ---
+  // --- Static PDF serving. Rendered resumes are personal data, so this requires
+  // the owner session (sent automatically by the dashboard's <iframe>/download)
+  // or an X-API-Key header — it is no longer openly accessible. ---
+  app.use("/pdfs/*", apiKeyAuth);
   app.get("/pdfs/:file", async (c) => {
     const file = c.req.param("file");
     // Guard against path traversal — only a bare filename is allowed.
