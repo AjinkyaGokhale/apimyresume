@@ -80,7 +80,8 @@ export interface TemplateDto {
   id: string;
   name: string;
   description?: string;
-  paperSize?: string;
+  thumbnail_url: string;
+  paper_size?: string;
   engine: string;
 }
 

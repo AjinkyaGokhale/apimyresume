@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { readBody } from "../body.ts";
 import { baseDto } from "../dto.ts";
+import { ownerOnly } from "../middleware/auth.ts";
 import {
   createBase,
   deleteBase,
@@ -20,7 +21,7 @@ export const bases = new Hono();
 
 bases.get("/", (c) => c.json(listBases()));
 
-bases.post("/", async (c) => {
+bases.post("/", ownerOnly, async (c) => {
   const base = createBase(await readBody(c));
   return c.json(baseDto(base), 201);
 });
@@ -35,12 +36,12 @@ bases.get("/:id/thumbnail.svg", async (c) => {
   return c.body(svg);
 });
 
-bases.patch("/:id", async (c) => {
+bases.patch("/:id", ownerOnly, async (c) => {
   const updated = updateBase(c.req.param("id"), await readBody(c));
   return c.json(baseDto(updated!));
 });
 
-bases.delete("/:id", async (c) => {
+bases.delete("/:id", ownerOnly, async (c) => {
   const cascade = c.req.query("cascade") === "true";
   await deleteBase(c.req.param("id"), { cascade });
   return c.body(null, 204);
@@ -92,6 +93,7 @@ bases.get("/:id/content", (c) => {
  */
 bases.patch(
   "/:id/experience/:entryId/bullets",
+  ownerOnly,
   zValidator("json", z.array(z.string().min(1)).min(1)),
   async (c) => {
     const bullets = c.req.valid("json");
@@ -107,7 +109,7 @@ bases.get("/:id/export", (c) => {
   return c.body(YAML.stringify(base.data));
 });
 
-bases.post("/:id/regenerate-children", async (c) => {
+bases.post("/:id/regenerate-children", ownerOnly, async (c) => {
   const results = await regenerateChildren(c.req.param("id"));
   return c.json({ regenerated: results.length, children: results });
 });

@@ -4,7 +4,8 @@
   import { onMount, onDestroy } from "svelte";
   import YAML from "yaml";
   import Icon from "$lib/Icon.svelte";
-  import { getApiKey, getApiUrl } from "$lib/api";
+  import { handleYamlKeydown } from "$lib/yamlEditor";
+  import { getApiKey, getApiUrl, listTemplates, type TemplateDto } from "$lib/api";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -19,6 +20,10 @@
   let toast = $state<string | null>(null);
   let isPreviewLoading = $state(false);
   let lastPreviewData = $state<string>("");
+
+  // Available base templates for the visual picker. The human fixes the
+  // template here once; child resumes always inherit it (never tailorable).
+  let templates = $state<TemplateDto[]>([]);
 
   function baseToYaml(base: NonNullable<typeof editingBase>): string {
     const doc: Record<string, unknown> = {
@@ -118,6 +123,20 @@ skills:
 
   const pageTitle = $derived(editingBase ? `Edit base — ${editingBase.name}` : "Create base resume");
   const submitLabel = $derived(editingBase ? "Save changes" : "Create base");
+
+  /** The template id currently set in the YAML (drives the picker highlight). */
+  const currentTemplate = $derived(yamlContent.match(/^template:\s*(.+)$/m)?.[1].trim() ?? "");
+
+  /** Rewrite the top-level `template:` line in the editor, then recompile. */
+  function selectTemplate(id: string) {
+    if (id === currentTemplate) return;
+    if (/^template:\s*.+$/m.test(yamlContent)) {
+      yamlContent = yamlContent.replace(/^template:\s*.+$/m, `template: ${id}`);
+    } else {
+      yamlContent = `template: ${id}\n${yamlContent}`;
+    }
+    if (validateYaml()) void compile();
+  }
 
   function showToast(msg: string) {
     toast = msg;
@@ -340,7 +359,11 @@ skills:
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       if (isValidYaml && !isPreviewLoading) compile();
+      return;
     }
+    // Auto-indent on Enter, Tab to indent/outdent (the synthetic input event
+    // it fires re-runs validation via the textarea's oninput).
+    handleYamlKeydown(e);
   }
 
   async function compile() {
@@ -395,6 +418,9 @@ skills:
   // Render once automatically when the editor opens; after that it's manual.
   onMount(() => {
     void compile();
+    listTemplates()
+      .then((t) => (templates = t))
+      .catch((e) => console.error("Failed to load templates:", e));
   });
 
   onDestroy(() => {
@@ -535,6 +561,34 @@ skills:
       </div>
     </header>
 
+    {#if templates.length}
+      <div class="template-strip">
+        <span class="template-strip-label">Template</span>
+        <div class="template-cards">
+          {#each templates as t (t.id)}
+            <button
+              type="button"
+              class="template-card"
+              class:selected={t.id === currentTemplate}
+              onclick={() => selectTemplate(t.id)}
+              title={t.description ?? t.name}
+            >
+              <img
+                class="template-thumb"
+                src={`${getApiUrl()}${t.thumbnail_url}`}
+                alt={t.name}
+                loading="lazy"
+              />
+              <span class="template-name">{t.name}</span>
+              {#if t.id === currentTemplate}
+                <span class="template-check"><Icon name="check" size={13} /></span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <div class="detail-body">
       <aside class="diff-pane">
         <div class="pane-head">
@@ -662,6 +716,91 @@ skills:
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  .template-strip {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+
+  .template-strip-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .template-cards {
+    display: flex;
+    gap: 10px;
+  }
+
+  .template-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    width: 86px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.12s;
+  }
+
+  .template-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .template-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .template-thumb {
+    width: 100%;
+    aspect-ratio: 17 / 22;
+    object-fit: cover;
+    object-position: top;
+    border-radius: 3px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+  }
+
+  .template-name {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-soft);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .template-check {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-contrast);
   }
 
   .detail-body {

@@ -34,9 +34,9 @@ async function previewChild(doc: Record<string, unknown>): Promise<{ pdf: Uint8A
     throw badRequest(`Base resume '${baseId}' not found`, "base_not_found", "base_id");
   }
 
-  // Honour template_lock exactly like createResume's resolveTemplate.
-  const requested = typeof normalized.template === "string" ? normalized.template : undefined;
-  const templateId = requested && !base.data.template_lock ? requested : base.template;
+  // Children always inherit the base template (same rule as createResume's
+  // resolveTemplate) — a requested override is ignored.
+  const templateId = base.template;
   const template = templateRegistry.get(templateId);
   if (!template) {
     throw badRequest(`template '${templateId}' not found`, "template_not_found", "template");

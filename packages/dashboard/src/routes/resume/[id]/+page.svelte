@@ -1,6 +1,7 @@
 <script lang="ts">
   import YAML from "yaml";
   import Icon from "$lib/Icon.svelte";
+  import { handleYamlKeydown, formatYaml } from "$lib/yamlEditor";
   import { getApiKey, getApiUrl } from "$lib/api";
   import type { ResumeDto } from "$lib/types";
   import type { PageData } from "./$types";
@@ -11,14 +12,46 @@
 
   const pdfHref = $derived(r.pdf_url ? `${getApiUrl()}${r.pdf_url}` : "");
 
-  function buildYaml(resume: ResumeDto): string {
+  /** Editable content sections, in display order (mirrors the API's overridesSchema). */
+  const EDITABLE_SECTIONS = [
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "certifications",
+    "extracurriculars",
+    "languages",
+    "awards",
+    "custom",
+  ] as const;
+
+  /** Tailoring directives surfaced so they round-trip through the editor. */
+  const DIRECTIVES = ["keywords", "skills_highlight"] as const;
+
+  function isNonEmpty(v: unknown): boolean {
+    return Array.isArray(v) ? v.length > 0 : v != null;
+  }
+
+  function buildYaml(resume: ResumeDto, merged: Record<string, unknown>): string {
     const obj: Record<string, unknown> = {};
     if (resume.company) obj.company = resume.company;
     if (resume.role) obj.role = resume.role;
     if (resume.tags?.length) obj.tags = resume.tags;
+
+    // Always show the full *resolved* content (base + any existing overrides),
+    // so experience bullets, projects and skills are right there to edit — not
+    // hidden behind a sparse diff. Saving stores the edited sections as the
+    // child's overrides.
+    for (const key of EDITABLE_SECTIONS) {
+      if (isNonEmpty(merged[key])) obj[key] = merged[key];
+    }
+
+    // Keep pure directives visible so they survive a round-trip. (inject_bullets
+    // is intentionally omitted — its effect is already baked into the resolved
+    // experience bullets above, so re-storing it would double-apply.)
     const overrides = (resume.overrides ?? {}) as Record<string, unknown>;
-    for (const [k, v] of Object.entries(overrides)) {
-      if (v != null) obj[k] = v;
+    for (const key of DIRECTIVES) {
+      if (isNonEmpty(overrides[key])) obj[key] = overrides[key];
     }
     return YAML.stringify(obj, { lineWidth: 0 });
   }
@@ -43,7 +76,7 @@
     return payload;
   }
 
-  let yamlContent = $state(buildYaml(r));
+  let yamlContent = $state(buildYaml(r, data.merged));
   let yamlError = $state<string | null>(null);
   let isValidYaml = $state(true);
   let previewUrl = $state("");
@@ -106,6 +139,17 @@
     if (debounceTimer) clearTimeout(debounceTimer);
     if (!isValidYaml) return;
     debounceTimer = setTimeout(runPreview, 500);
+  }
+
+  /** Pretty-print the whole document on demand (no-op if currently invalid). */
+  function onFormat() {
+    const pretty = formatYaml(yamlContent);
+    if (pretty == null) {
+      showToast("Fix YAML errors before formatting");
+      return;
+    }
+    yamlContent = pretty;
+    onInput();
   }
 
   $effect(() => {
@@ -190,18 +234,24 @@
     <aside class="diff-pane">
       <div class="pane-head">
         <span class="label">Override YAML</span>
-        {#if yamlError}
-          <span class="label error" title={yamlError}>
-            {yamlError.length > 48 ? yamlError.slice(0, 48) + "…" : yamlError}
-          </span>
-        {:else if isValidYaml}
-          <span class="label ok">Valid</span>
-        {/if}
+        <div class="pane-head-right">
+          {#if yamlError}
+            <span class="label error" title={yamlError}>
+              {yamlError.length > 36 ? yamlError.slice(0, 36) + "…" : yamlError}
+            </span>
+          {:else if isValidYaml}
+            <span class="label ok">Valid</span>
+          {/if}
+          <button class="btn fmt" onclick={onFormat} disabled={!isValidYaml} title="Format YAML">
+            <Icon name="braces" size={13} /> Format
+          </button>
+        </div>
       </div>
       <textarea
         class="yaml-editor"
         bind:value={yamlContent}
         oninput={onInput}
+        onkeydown={handleYamlKeydown}
         spellcheck="false"
       ></textarea>
     </aside>
@@ -324,6 +374,18 @@
 
   .pane-head .label.ok {
     color: var(--badge-green-text);
+  }
+
+  .pane-head-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .btn.fmt {
+    padding: 4px 9px;
+    font-size: 12px;
   }
 
   .pane-head .label.loading {

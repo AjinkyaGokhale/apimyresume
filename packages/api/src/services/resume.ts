@@ -28,17 +28,21 @@ export interface ResumeResult {
 }
 
 /** Resolve the effective template id, honouring base template_lock (spec §6). */
+/**
+ * Resolve which template a child resume renders with. Children always inherit
+ * the base's template — the template is part of the base structure the human
+ * owner fixes, and is never tailorable per child. A requested override is
+ * ignored with a warning so AI agents can't switch templates.
+ */
 function resolveTemplate(
   requested: string | undefined,
   baseTemplate: string,
-  templateLock: boolean,
 ): { template: string; warnings: string[] } {
   const warnings: string[] = [];
-  if (templateLock && requested && requested !== baseTemplate) {
-    warnings.push("template override ignored — base is locked");
-    return { template: baseTemplate, warnings };
+  if (requested && requested !== baseTemplate) {
+    warnings.push("template override ignored — children inherit the base template");
   }
-  return { template: requested ?? baseTemplate, warnings };
+  return { template: baseTemplate, warnings };
 }
 
 /**
@@ -83,11 +87,7 @@ export async function createResume(rawBody: unknown): Promise<ResumeResult> {
     throw notFound(`Base resume '${payload.base_id}' not found`, "base_not_found", "base_id");
   }
 
-  const { template, warnings: tplWarnings } = resolveTemplate(
-    payload.template,
-    base.template,
-    base.data.template_lock,
-  );
+  const { template, warnings: tplWarnings } = resolveTemplate(payload.template, base.template);
 
   const id = `resume_${nanoid(12)}`;
   const inserted = resumeRepo.insert({
@@ -117,7 +117,6 @@ export async function updateResume(id: string, rawBody: unknown): Promise<Resume
   const { template, warnings: tplWarnings } = resolveTemplate(
     payload.template ?? existing.template,
     base.template,
-    base.data.template_lock,
   );
 
   const updated = resumeRepo.update(id, {
