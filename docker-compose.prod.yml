@@ -1,0 +1,57 @@
+# APIMyResume — public deployment with a custom domain + automatic HTTPS.
+#
+# Bundles a Caddy reverse proxy that provisions a free Let's Encrypt
+# certificate for your domain and terminates TLS. The app itself is never
+# exposed directly — only Caddy publishes ports 80/443.
+#
+# Prerequisites:
+#   1. A domain (e.g. resume.example.com) with a DNS A/AAAA record pointing at
+#      this server's public IP.
+#   2. Ports 80 and 443 open to the internet (Let's Encrypt needs 80).
+#
+# Usage:
+#   DOMAIN=resume.example.com ACME_EMAIL=you@example.com \
+#     docker compose -f docker-compose.prod.yml up -d
+#
+# Your API key is auto-generated on first start:
+#   docker compose -f docker-compose.prod.yml logs api | grep "API key"
+services:
+  api:
+    build: .
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Auto-generates a strong key on first start if unset (see logs).
+      API_KEY: ${API_KEY:-}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      # Behind Caddy — trust its X-Forwarded-Proto / X-Forwarded-For so secure
+      # cookies and IP-based login throttling work correctly.
+      TRUST_PROXY: "true"
+    volumes:
+      - apimyresume-data:/data
+      - ./templates:/app/templates
+    restart: unless-stopped
+    # No `ports:` — the app is only reachable from Caddy on the internal network.
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to your custom domain, e.g. resume.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  apimyresume-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,19 @@
+# Caddy config for APIMyResume's public deployment (docker-compose.prod.yml).
+#
+# Caddy automatically obtains and renews a Let's Encrypt certificate for
+# {$DOMAIN} and reverse-proxies to the app container. It sets X-Forwarded-Proto
+# and X-Forwarded-For, which the app honours when TRUST_PROXY=true.
+{
+	# ACME account email (optional but recommended for expiry notices).
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+	reverse_proxy api:3000
+
+	# Cap upload size — resume payloads are small JSON documents.
+	request_body {
+		max_size 5MB
+	}
+}

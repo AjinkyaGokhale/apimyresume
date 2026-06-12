@@ -1,6 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { config } from "../config.ts";
 import { db } from "../db/index.ts";
 import { sessions, users, type SessionRow, type UserRow } from "../db/schema.ts";
 
@@ -179,10 +180,10 @@ export function readSessionCookie(header: string | null | undefined): string | n
 /** True if the request is served over HTTPS (proxied or direct). */
 export function isSecureRequest(url: string, xfp?: string | null): boolean {
   if (url.startsWith("https://")) return true;
-  if (!xfp) return false;
-  // Trust a forwarded-proto only from loopback/private hops in dev. For a
-  // single self-hosted instance the direct scheme is authoritative; we still
-  // honour a `proto=https` forwarded header because real deployments put the
-  // app behind a TLS-terminating proxy.
+  // A TLS-terminating reverse proxy forwards plain HTTP to the app but sets
+  // `X-Forwarded-Proto: https`. Only honour it when we're configured to trust
+  // the proxy — otherwise a directly-exposed instance could be tricked into
+  // marking insecure cookies as Secure.
+  if (!config.trustProxy || !xfp) return false;
   return xfp.split(",")[0]?.trim().toLowerCase() === "https";
 }

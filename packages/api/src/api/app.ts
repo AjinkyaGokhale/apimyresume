@@ -3,12 +3,15 @@ import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "hono/bun";
+import { secureHeaders } from "hono/secure-headers";
 import { ZodError } from "zod";
 import { config } from "../config.ts";
+import { isSecureRequest } from "../lib/auth.ts";
 import { AppError } from "../lib/errors.ts";
 import { log } from "../lib/log.ts";
 import { apiKeyAuth } from "./middleware/auth.ts";
 import { rateLimit } from "./middleware/ratelimit.ts";
+import { loginRateLimit } from "./middleware/loginlimit.ts";
 import { bases } from "./routes/bases.ts";
 import { resumes } from "./routes/resumes.ts";
 import { templates } from "./routes/templates.ts";
@@ -19,12 +22,18 @@ import { authRouter } from "./routes/auth.ts";
 /**
  * Hono application (spec §1, §18, §19). Wires the v1 API behind API-key auth
  * (or session-cookie auth for the dashboard) and per-key rate limiting, serves
- * PDFs publicly, and maps every thrown error to the consistent envelope.
+ * rendered PDFs to authenticated callers only, and maps every thrown error to
+ * the consistent envelope.
  */
 
-/** Paths reachable without auth (spec §18). */
+/**
+ * Paths reachable without auth (spec §18). Personal content is NOT public:
+ * rendered PDFs and the resume/base thumbnail SVGs (which embed the resume
+ * itself) require the owner session or an API key. Only non-personal assets —
+ * health, schema discovery, auth bootstrap, and the static template-preview
+ * thumbnails — are open.
+ */
 function isPublic(method: string, p: string): boolean {
-  if (p.startsWith("/pdfs/")) return true;
   if (p === "/api/v1/auth/state") return true;
   // Login / setup / logout endpoints are POST and must be reachable without
   // an existing session — otherwise no one could ever authenticate.
@@ -33,26 +42,39 @@ function isPublic(method: string, p: string): boolean {
   if (p === "/api/v1/auth/logout" && method === "POST") return true;
   if (method !== "GET") return false;
   if (p === "/api/v1/health" || p === "/api/v1/schema") return true;
+  // Static template-preview images (design previews, not user data).
   if (/^\/api\/v1\/templates\/[^/]+\/thumbnail$/.test(p)) return true;
-  // Rendered resume thumbnail (SVG) — embedded as <img> in the dashboard.
-  if (/^\/api\/v1\/resumes\/[^/]+\/thumbnail\.svg$/.test(p)) return true;
-  // Rendered base-resume thumbnail (SVG) — folder preview in the dashboard.
-  if (/^\/api\/v1\/bases\/[^/]+\/thumbnail\.svg$/.test(p)) return true;
   return false;
 }
 
 export function createApp() {
   const app = new Hono();
 
-  // --- CORS for dashboard development ---
+  // --- Baseline security headers (safe behind a proxy or direct). HSTS is only
+  // emitted on HTTPS so plain-HTTP local installs aren't pinned to TLS. ---
+  app.use("*", (c, next) =>
+    secureHeaders({
+      strictTransportSecurity: isSecureRequest(c.req.url, c.req.header("x-forwarded-proto"))
+        ? "max-age=31536000; includeSubDomains"
+        : false,
+      // The dashboard is a same-origin SPA; deny framing to prevent clickjacking.
+      xFrameOptions: "DENY",
+    })(c, next),
+  );
+
+  // --- CORS. The bundled dashboard is same-origin and needs no entry; this is
+  // for external browser clients only (configure via ALLOWED_ORIGINS). ---
   app.use("*", cors({
-    origin: ["http://localhost:4321", "http://localhost:5173", "http://localhost:5174"],
+    origin: config.allowedOrigins,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
     credentials: true,
   }));
 
-  // --- Public static PDF serving (spec §18: no auth for PDF files). ---
+  // --- Static PDF serving. Rendered resumes are personal data, so this requires
+  // the owner session (sent automatically by the dashboard's <iframe>/download)
+  // or an X-API-Key header — it is no longer openly accessible. ---
+  app.use("/pdfs/*", apiKeyAuth);
   app.get("/pdfs/:file", async (c) => {
     const file = c.req.param("file");
     // Guard against path traversal — only a bare filename is allowed.
@@ -62,6 +84,11 @@ export function createApp() {
     c.header("Content-Type", "application/pdf");
     return c.body(await f.arrayBuffer());
   });
+
+  // --- Brute-force throttle on the public owner login/setup endpoints. These
+  // bypass the per-key limiter below, so they get their own IP-based limiter. ---
+  app.use("/api/v1/auth/login", loginRateLimit);
+  app.use("/api/v1/auth/setup", loginRateLimit);
 
   // --- Auth + rate limit for everything except public paths. ---
   app.use("/api/v1/*", async (c, next) => {

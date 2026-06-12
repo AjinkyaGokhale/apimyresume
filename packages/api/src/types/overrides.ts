@@ -5,6 +5,7 @@ import {
   customSectionSchema,
   educationSchema,
   experienceSchema,
+  extracurricularSchema,
   languageSchema,
   projectSchema,
   skillSchema,
@@ -25,26 +26,28 @@ export const injectBulletsSchema = z.object({
 
 export type InjectBullets = z.infer<typeof injectBulletsSchema>;
 
-export const overridesSchema = z
-  .object({
-    // NOTE: `profile` is intentionally NOT overridable — name, title, contact
-    // and links are inherited from the base resume verbatim (enforced in
-    // mergeResume). Children may override the sections below and use directives.
-    experience: z.array(experienceSchema).optional(),
-    education: z.array(educationSchema).optional(),
-    skills: z.array(skillSchema).optional(),
-    projects: z.array(projectSchema).optional(),
-    certifications: z.array(certificationSchema).optional(),
-    languages: z.array(languageSchema).optional(),
-    awards: z.array(awardSchema).optional(),
-    custom: z.array(customSectionSchema).optional(),
+// NOTE: this schema deliberately does NOT `.passthrough()` — unknown keys are
+// stripped so an API-key client (AI agent) can only tailor the known content
+// sections + directives below and can never inject a structural key that
+// mergeResume would blindly merge onto the base. `profile` and `template` are
+// likewise non-tailorable (profile is inherited verbatim in mergeResume;
+// template is forced to the base's in resolveTemplate).
+export const overridesSchema = z.object({
+  experience: z.array(experienceSchema).optional(),
+  education: z.array(educationSchema).optional(),
+  skills: z.array(skillSchema).optional(),
+  projects: z.array(projectSchema).optional(),
+  certifications: z.array(certificationSchema).optional(),
+  extracurriculars: z.array(extracurricularSchema).optional(),
+  languages: z.array(languageSchema).optional(),
+  awards: z.array(awardSchema).optional(),
+  custom: z.array(customSectionSchema).optional(),
 
-    // Tailoring directives.
-    keywords: z.array(z.string()).optional(),
-    inject_bullets: z.array(injectBulletsSchema).optional(),
-    skills_highlight: z.array(z.string()).optional(),
-  })
-  .passthrough();
+  // Tailoring directives.
+  keywords: z.array(z.string()).optional(),
+  inject_bullets: z.array(injectBulletsSchema).optional(),
+  skills_highlight: z.array(z.string()).optional(),
+});
 
 export type Overrides = z.infer<typeof overridesSchema>;
 

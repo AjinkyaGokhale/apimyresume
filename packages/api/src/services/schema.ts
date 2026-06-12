@@ -25,9 +25,11 @@ export function buildSchemaDocument() {
       },
       template: {
         type: "string",
-        description: "Template id to render with. Defaults to the base's template.",
-        ...(ordered.length ? { enum: ordered, default: ordered[0] } : {}),
-        example: ordered[0] ?? "basic-resume",
+        description:
+          "Read-only — do NOT set. Child resumes always inherit the base's template; " +
+          "any value here is ignored (with a warning). The template is part of the " +
+          "base structure the human owner fixes, never tailorable per child.",
+        ...(ordered.length ? { enum: ordered } : {}),
       },
       tags: {
         type: "array",
@@ -46,10 +48,33 @@ export function buildSchemaDocument() {
       overrides: {
         type: "object",
         description:
-          "Diff applied on top of the base KB to tailor this resume. " +
-          "NOTE: `profile` (name, title, contact, links) is NOT overridable — it is " +
-          "inherited from the base resume verbatim. Tailor the sections and directives below.",
+          "Content-only diff applied on top of the base KB to tailor this resume. " +
+          "Only the content sections and directives below are accepted — `profile` " +
+          "(name, title, contact, links) and `template` are inherited from the base " +
+          "and are NOT overridable, and any other/unknown keys are silently dropped. " +
+          "A section you send REPLACES that whole section for this child; read the base " +
+          "via GET /api/v1/bases/{id}/content first, then send back the edited section.",
         properties: {
+          // Replaceable content sections (each mirrors the base KB section).
+          experience: {
+            type: "array",
+            description: "Replace the experience list (rewrite bullets, reorder, trim) for this child.",
+          },
+          skills: {
+            type: "array",
+            description:
+              "Replace the skills list for this child.",
+            example: [{ category: "Languages", items: ["Go", "Python"] }],
+          },
+          projects: { type: "array", description: "Replace the projects list for this child." },
+          education: { type: "array", description: "Replace the education list for this child." },
+          certifications: { type: "array", description: "Replace the certifications list for this child." },
+          extracurriculars: { type: "array", description: "Replace the extracurriculars list for this child." },
+          languages: { type: "array", description: "Replace the languages list for this child." },
+          awards: { type: "array", description: "Replace the awards list for this child." },
+          custom: { type: "array", description: "Replace the custom sections for this child." },
+
+          // Tailoring directives.
           keywords: {
             type: "array",
             items: { type: "string" },
@@ -58,7 +83,9 @@ export function buildSchemaDocument() {
           },
           inject_bullets: {
             type: "array",
-            description: "Append/prepend/replace bullets on an experience entry by id.",
+            description:
+              "Append/prepend/replace bullets on an experience entry by id — the surgical " +
+              "way to rewrite work-experience bullets without resending the whole section.",
             items: {
               type: "object",
               properties: {
@@ -69,6 +96,12 @@ export function buildSchemaDocument() {
               required: ["target", "bullets"],
             },
           },
+          skills_highlight: {
+            type: "array",
+            items: { type: "string" },
+            description: "Skill names to emphasise for this role.",
+            example: ["Go", "Kubernetes"],
+          },
         },
       },
     },
@@ -78,7 +111,21 @@ export function buildSchemaDocument() {
   // Human-readable reference for managing the base resume (the canonical KB
   // that child resumes derive from). Kept alongside the create_resume tool so
   // both live under the single /api/v1/schema discovery document.
+  //
+  // AUTH MODEL: base resumes are created and edited only by the human owner via
+  // the dashboard (owner session). All base *writes* below require that session
+  // and return 403 `owner_only` for API-key clients. API keys may READ bases and
+  // create/tailor child resumes (POST /api/v1/resumes) — that is their surface.
+  const ownerOnly = "Owner session (dashboard) — returns 403 for API keys";
   const baseEndpoints = [
+    {
+      method: "GET",
+      path: "/api/v1/bases/{id}/content",
+      summary:
+        "Read a base resume's tailorable content (experience, skills, profile summary) " +
+        "in an AI-friendly shape — call this before creating a tailored child.",
+      auth: "X-API-Key",
+    },
     {
       method: "GET",
       path: "/api/v1/bases/{id}",
@@ -88,8 +135,8 @@ export function buildSchemaDocument() {
     {
       method: "PATCH",
       path: "/api/v1/bases/{id}",
-      summary: "Update a base resume.",
-      auth: "X-API-Key",
+      summary: "Update a base resume (owner only — structural edits are a human action).",
+      auth: ownerOnly,
       content_type: "application/json",
       body: "A partial KB — every top-level field is optional except `id`, which is immutable.",
       notes: [
@@ -116,21 +163,25 @@ export function buildSchemaDocument() {
       method: "POST",
       path: "/api/v1/bases/{id}/regenerate-children",
       summary: "Re-render every child resume using the current base + each child's stored overrides.",
-      auth: "X-API-Key",
+      auth: ownerOnly,
       returns: { regenerated: "number", children: ["{ id, pdf_url, version }"] },
     },
     {
       method: "DELETE",
       path: "/api/v1/bases/{id}",
       summary: "Delete a base. Rejected with 409 if it has children unless `?cascade=true`, which also deletes every child resume and its PDF.",
-      auth: "X-API-Key",
+      auth: ownerOnly,
     },
   ];
 
   return {
     name: "create_resume",
     description:
-      "Create a tailored resume from a base resume. Returns a rendered PDF url. " +
+      "Create a tailored CHILD resume from a base resume and return a rendered PDF url. " +
+      "This is the API surface for AI agents / n8n / Zapier: tailor content (rewrite " +
+      "bullets via inject_bullets, swap skills/projects, inject keywords). The base's " +
+      "template and profile are inherited and cannot be changed here, and base resumes " +
+      "themselves are created/edited only by the human owner in the dashboard. " +
       "Loose field names are normalised — see x-aliases.",
     // OpenAI function-calling shape:
     parameters,

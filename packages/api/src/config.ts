@@ -20,6 +20,19 @@ function str(name: string, fallback: string): string {
   return raw === undefined || raw.trim() === "" ? fallback : raw;
 }
 
+function bool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(raw.trim().toLowerCase());
+}
+
+/** Localhost origins allowed by default so the dashboard dev server works out of the box. */
+const DEV_ORIGINS = [
+  "http://localhost:4321",
+  "http://localhost:5173",
+  "http://localhost:5174",
+];
+
 /** Resolve relative to repo root (two levels up from packages/api/src/). */
 const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 
@@ -69,7 +82,27 @@ export const config = {
   renderWorkers: int("RENDER_WORKERS", defaultWorkers()),
   renderTimeoutMs: int("RENDER_TIMEOUT_MS", 30_000),
 
-  rateLimitPerMinute: int("RATE_LIMIT_PER_MINUTE", 0),
+  // Per-API-key request budget. Default 120/min is generous for normal
+  // automation but stops abuse on a public instance. Set 0 to disable.
+  rateLimitPerMinute: int("RATE_LIMIT_PER_MINUTE", 120),
+
+  // Brute-force protection on the owner login/setup endpoints (per client IP).
+  loginMaxAttempts: int("LOGIN_RATE_LIMIT", 10),
+  loginWindowMs: int("LOGIN_RATE_WINDOW_MS", 15 * 60_000),
+
+  // Trust X-Forwarded-* headers: proto (for Secure cookies) and for (the real
+  // client IP). Enable ONLY when running behind a trusted reverse proxy that
+  // sets these headers (the recommended custom-domain deployment). Disable if
+  // the container port is exposed directly, or clients could spoof them.
+  trustProxy: bool("TRUST_PROXY", true),
+
+  // Browser origins allowed to call the API cross-origin (comma-separated).
+  // The bundled dashboard is served same-origin and needs no entry here; this
+  // is only for external browser clients. Defaults to localhost dev servers.
+  allowedOrigins: str("ALLOWED_ORIGINS", DEV_ORIGINS.join(","))
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
 
   dashboardDir: abs(str("DASHBOARD_DIR", "packages/dashboard/build")),
 } as const;

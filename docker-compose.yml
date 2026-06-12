@@ -1,15 +1,25 @@
-# APIMyResume — single-command deployment.
+# APIMyResume — single-command local deployment.
 # `docker compose up -d` starts the full app (API + dashboard) on :3000.
+#
+# The port is bound to 127.0.0.1 so the container is NOT directly reachable
+# from the internet. To expose it on a public custom domain with HTTPS, use
+# docker-compose.prod.yml (bundled Caddy reverse proxy) instead — see README.
 services:
   api:
     build: .
     ports:
-      - "3000:3000"
+      # Loopback-only: reachable from this host (and a local reverse proxy),
+      # not from the network. Use docker-compose.prod.yml to go public.
+      - "127.0.0.1:3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
-      API_KEY: ${API_KEY:-amr_local_dev_key}
+      # Leave API_KEY unset to auto-generate a strong key on first start
+      # (printed in the logs). Override only with your own strong key.
+      API_KEY: ${API_KEY:-}
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      # Only honour X-Forwarded-* headers when behind a trusted proxy.
+      TRUST_PROXY: ${TRUST_PROXY:-false}
     volumes:
       - apimyresume-data:/data
       - ./templates:/app/templates

@@ -42,9 +42,12 @@
     <section class="card">
       <h2><Icon name="lock" size={16} /> Authentication</h2>
       <p>
-        Every endpoint requires your API key in the <code>X-API-Key</code> header — except the public
-        <code>GET /health</code>, <code>GET /schema</code>, rendered PDFs, and <code>*/thumbnail.svg</code>
-        previews.
+        Send your key in the <code>X-API-Key</code> header. API keys can read bases and
+        create &amp; tailor child resumes. <strong>Base writes</strong> (create / edit / delete a
+        base, regenerate children) and API-key management are <strong>owner-only</strong> — done
+        in the dashboard with the owner session; they return <code>403 owner_only</code> for API
+        keys. Public, no auth: <code>GET /health</code>, <code>GET /schema</code>, rendered PDFs,
+        and <code>*/thumbnail.svg</code> previews.
       </p>
       <pre class="code"><code>curl -H "X-API-Key: YOUR_KEY" {publicApiUrl}/api/v1/bases</code></pre>
     </section>
@@ -54,7 +57,8 @@
       <section>
         <h2 class="section-title">Base resume</h2>
         <p class="section-sub">
-          The base resume is the canonical knowledge base. Manage it with these endpoints.
+          The base resume is the canonical knowledge base. Reads are open to API keys; writes are
+          owner-only (managed in the dashboard) — see the auth label on each endpoint.
         </p>
 
         {#each schema.endpoints as ep (ep.method + ep.path)}
