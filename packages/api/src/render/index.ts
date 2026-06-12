@@ -25,7 +25,41 @@ export async function renderToPdf(
 export async function renderToSvg(template: RegisteredTemplate, merged: MergedDoc): Promise<string> {
   const out = await dispatch(template, merged, "svg");
   if (!out.svg) throw new Error("Render produced no SVG");
-  return out.svg;
+  // Thumbnails are a snapshot of the first page only, regardless of how many
+  // pages the resume spans.
+  return firstPageOnly(out.svg);
+}
+
+/**
+ * Crop a rich Typst SVG to its first page. The `svg()` export stacks every page
+ * vertically inside one root `<svg>` (viewBox height = sum of all pages); a
+ * thumbnail should show only page one. We read the first `typst-page` group's
+ * dimensions and shrink the root viewport to it, so the viewport clips the rest.
+ *
+ * Returns the input unchanged if the structure isn't recognised — defensive
+ * against future changes to the `svg()` output format.
+ */
+export function firstPageOnly(svg: string): string {
+  const page = svg.match(
+    /<g class="typst-page"[^>]*\bdata-page-width="([\d.]+)"[^>]*\bdata-page-height="([\d.]+)"/,
+  );
+  if (!page) return svg;
+  const [, w, h] = page;
+
+  const end = svg.indexOf(">");
+  if (end === -1) return svg;
+  const head = svg
+    .slice(0, end + 1)
+    .replace(/viewBox="[^"]*"/, `viewBox="0 0 ${w} ${h}"`)
+    .replace(/ width="[^"]*"/, ` width="${w}"`)
+    .replace(/ height="[^"]*"/, ` height="${h}"`)
+    .replace(/data-width="[^"]*"/, `data-width="${w}"`)
+    .replace(/data-height="[^"]*"/, `data-height="${h}"`)
+    // The root carries `overflow: visible`; force clipping so later pages that
+    // sit below the first don't bleed past the cropped viewport.
+    .replace(/overflow:\s*visible/, "overflow: hidden");
+
+  return head + svg.slice(end + 1);
 }
 
 function dispatch(

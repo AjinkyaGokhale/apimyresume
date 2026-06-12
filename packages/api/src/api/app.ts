@@ -3,12 +3,15 @@ import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "hono/bun";
+import { secureHeaders } from "hono/secure-headers";
 import { ZodError } from "zod";
 import { config } from "../config.ts";
+import { isSecureRequest } from "../lib/auth.ts";
 import { AppError } from "../lib/errors.ts";
 import { log } from "../lib/log.ts";
 import { apiKeyAuth } from "./middleware/auth.ts";
 import { rateLimit } from "./middleware/ratelimit.ts";
+import { loginRateLimit } from "./middleware/loginlimit.ts";
 import { bases } from "./routes/bases.ts";
 import { resumes } from "./routes/resumes.ts";
 import { templates } from "./routes/templates.ts";
@@ -44,9 +47,22 @@ function isPublic(method: string, p: string): boolean {
 export function createApp() {
   const app = new Hono();
 
-  // --- CORS for dashboard development ---
+  // --- Baseline security headers (safe behind a proxy or direct). HSTS is only
+  // emitted on HTTPS so plain-HTTP local installs aren't pinned to TLS. ---
+  app.use("*", (c, next) =>
+    secureHeaders({
+      strictTransportSecurity: isSecureRequest(c.req.url, c.req.header("x-forwarded-proto"))
+        ? "max-age=31536000; includeSubDomains"
+        : false,
+      // The dashboard is a same-origin SPA; deny framing to prevent clickjacking.
+      xFrameOptions: "DENY",
+    })(c, next),
+  );
+
+  // --- CORS. The bundled dashboard is same-origin and needs no entry; this is
+  // for external browser clients only (configure via ALLOWED_ORIGINS). ---
   app.use("*", cors({
-    origin: ["http://localhost:4321", "http://localhost:5173", "http://localhost:5174"],
+    origin: config.allowedOrigins,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "X-API-Key", "Authorization"],
     credentials: true,
@@ -62,6 +78,11 @@ export function createApp() {
     c.header("Content-Type", "application/pdf");
     return c.body(await f.arrayBuffer());
   });
+
+  // --- Brute-force throttle on the public owner login/setup endpoints. These
+  // bypass the per-key limiter below, so they get their own IP-based limiter. ---
+  app.use("/api/v1/auth/login", loginRateLimit);
+  app.use("/api/v1/auth/setup", loginRateLimit);
 
   // --- Auth + rate limit for everything except public paths. ---
   app.use("/api/v1/*", async (c, next) => {
