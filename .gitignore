@@ -19,5 +19,3 @@ dist/
 packages/dashboard/build/
 packages/dashboard/.svelte-kit/
 
-# Internal dev docs (root only — not the dashboard's docs route)
-/docs/
