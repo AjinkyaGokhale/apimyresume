@@ -6,6 +6,8 @@ Keep one profile and turn it into beautiful, professional PDF resumes — then c
 
 Create one base resume. Generate unlimited targeted versions per company and role, each rendered as a pixel-perfect PDF via [Typst](https://typst.app).
 
+![APIMyResume dashboard](docs/snaps/snap1.png)
+
 ---
 
 ## What you can do

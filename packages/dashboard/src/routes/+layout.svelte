@@ -2,6 +2,7 @@
   import "../app.css";
   import { invalidateAll, goto } from "$app/navigation";
   import { page } from "$app/stores";
+  import { version } from "$app/environment";
   import { authLogout } from "$lib/auth";
   import Icon from "$lib/Icon.svelte";
   import NavLoader from "$lib/NavLoader.svelte";
@@ -34,6 +35,7 @@
   const onResumes = $derived($page.url.pathname === "/" || $page.url.pathname.startsWith("/base/"));
   const onDocs = $derived($page.url.pathname === "/docs");
   const onApiKeys = $derived($page.url.pathname === "/api-keys");
+  const onAuth = $derived($page.url.pathname === "/authentication");
   const isAuthPage = $derived($page.url.pathname === "/login" || $page.url.pathname === "/setup");
   // Auth pages render the slot naked (no sidebar, no top bar).
   const showShell = $derived(!isAuthPage);
@@ -43,16 +45,9 @@
   // `onResumes || (onDocs && !editor)` and leaks editor pages into the constrained column.
   const constrained = $derived.by(() => {
     if (editor) return false;
-    return onResumes || onDocs || onApiKeys;
+    return onResumes || onDocs || onApiKeys || onAuth;
   });
 
-  const settingsItems = [
-    { label: "Profile", icon: "user" },
-    { label: "Preferences", icon: "settings" },
-    { label: "Authentication", icon: "lock" },
-    { label: "Integrations", icon: "plug" },
-    { label: "Danger Zone", icon: "alert", danger: true },
-  ] as const;
 </script>
 
 {#snippet brand()}
@@ -96,13 +91,10 @@
         <Icon name="key" size={17} />
         <span class="label">API Keys</span>
       </a>
-      {#each settingsItems as item (item.label)}
-        <span class="nav-item disabled" class:danger={"danger" in item && item.danger}>
-          <Icon name={item.icon} size={17} />
-          <span class="label">{item.label}</span>
-          <span class="soon">soon</span>
-        </span>
-      {/each}
+      <a class="nav-item" class:active={onAuth} href="/authentication" onclick={close}>
+        <Icon name="lock" size={17} />
+        <span class="label">Authentication</span>
+      </a>
 
       <div class="nav-spacer"></div>
       <button class="nav-item sign-out" type="button" onclick={signOut} aria-label="Sign out">
@@ -110,6 +102,7 @@
         <span class="label">Sign out</span>
       </button>
       <div class="credits">Built with <Icon name="heart" size={14} /> by <span>Ajinkya Gokhale</span></div>
+      <div class="app-version">v{version}</div>
     </aside>
 
     <main class="main" class:constrained={constrained} class:editor={editor}>
@@ -136,6 +129,21 @@
 
   .credits span {
     color: var(--text);
+  }
+
+  .app-version {
+    padding: 0 12px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Mobile: the sidebar is a slide-out drawer — center the version label. */
+  @media (max-width: 860px) {
+    .app-version {
+      text-align: center;
+    }
   }
 
   .credits :global(.icon) {

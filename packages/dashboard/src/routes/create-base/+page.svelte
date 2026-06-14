@@ -143,174 +143,19 @@ skills:
     setTimeout(() => (toast = null), 2000);
   }
 
-  // Robust YAML parser
+  // Parse the editor YAML with the real YAML parser so value types are
+  // preserved (booleans like template_lock, numbers, nested arrays/objects).
+  // The previous hand-rolled parser stringified every value, which broke schema
+  // validation — e.g. `template_lock: false` became the string "false", so the
+  // API rejected the save with a 422 and the base looked "locked" / uneditable.
   function parseYamlToJson(yaml: string): Record<string, unknown> | null {
     try {
-      const result: Record<string, unknown> = {};
-      const lines = yaml.split('\n');
-      let currentTop: string | null = null;
-      let currentSub: string | null = null;
-      let currentArray: string | null = null;
-      let currentItem: Record<string, unknown> | null = null;
-      let multiLineKey: string | null = null;
-      let multiLineContent: string[] = [];
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmed = line.trim();
-
-        // Skip comments
-        if (trimmed.startsWith('#')) continue;
-        if (!trimmed) {
-          // End of multi-line if blank line
-          if (multiLineKey && currentItem) {
-            currentItem[multiLineKey] = multiLineContent.join('\n');
-            multiLineKey = null;
-            multiLineContent = [];
-          }
-          continue;
-        }
-
-        const indent = line.length - line.trimStart().length;
-
-        // Handle multi-line content
-        if (multiLineKey && currentItem && indent >= 8) {
-          multiLineContent.push(trimmed);
-          continue;
-        }
-
-        // End multi-line if indentation changes
-        if (multiLineKey && currentItem && indent < 8) {
-          currentItem[multiLineKey] = multiLineContent.join('\n');
-          multiLineKey = null;
-          multiLineContent = [];
-        }
-
-        // Top level: template: basic-resume
-        if (indent === 0 && trimmed.includes(':')) {
-          const colonIdx = trimmed.indexOf(':');
-          const key = trimmed.slice(0, colonIdx).trim();
-          const value = trimmed.slice(colonIdx + 1).trim();
-
-          if (value) {
-            // Simple key: value
-            if (value.startsWith('[') && value.endsWith(']')) {
-              // Array literal: [a, b, c]
-              result[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-            } else {
-              result[key] = value.replace(/^["']|["']$/g, '');
-            }
-            currentTop = null;
-          } else {
-            // Start of section
-            currentTop = key;
-            currentSub = null;
-            currentArray = null;
-            currentItem = null;
-            result[currentTop] = {};
-          }
-          continue;
-        }
-
-        // In section: profile: (indent 2)
-        if (currentTop && indent === 2 && !trimmed.startsWith('-')) {
-          const colonIdx = trimmed.indexOf(':');
-          if (colonIdx > 0) {
-            const key = trimmed.slice(0, colonIdx).trim();
-            const value = trimmed.slice(colonIdx + 1).trim();
-
-            if (currentTop === 'profile') {
-              if (key === 'links') {
-                (result.profile as Record<string, unknown>).links = {};
-                currentSub = 'links';
-              } else if (value) {
-                (result.profile as Record<string, unknown>)[key] = value.replace(/^["']|["']$/g, '');
-                currentSub = null;
-              }
-            } else if (value) {
-              (result[currentTop] as Record<string, unknown>)[key] = value.replace(/^["']|["']$/g, '');
-            }
-          }
-          continue;
-        }
-
-        // In profile.links: linkedin: url (indent 4)
-        if (currentTop === 'profile' && indent === 4 && currentSub === 'links') {
-          const colonIdx = trimmed.indexOf(':');
-          if (colonIdx > 0) {
-            const key = trimmed.slice(0, colonIdx).trim();
-            const value = trimmed.slice(colonIdx + 1).trim();
-            ((result.profile as Record<string, unknown>).links as Record<string, string>)[key] = value.replace(/^["']|["']$/g, '');
-          }
-          continue;
-        }
-
-        // Start of array item: - id: acme (indent 2)
-        if (currentTop && indent === 2 && trimmed.startsWith('- ')) {
-          if (!Array.isArray(result[currentTop])) {
-            result[currentTop] = [];
-          }
-          currentArray = currentTop;
-
-          const rest = trimmed.slice(2).trim();
-          const colonIdx = rest.indexOf(':');
-          currentItem = {};
-          (result[currentTop] as unknown[]).push(currentItem);
-
-          if (colonIdx > 0) {
-            const key = rest.slice(0, colonIdx).trim();
-            const value = rest.slice(colonIdx + 1).trim();
-            currentItem[key] = value.replace(/^["']|["']$/g, '');
-          }
-          continue;
-        }
-
-        // Properties of array items (indent 4 or 6)
-        if (currentArray && currentItem && indent >= 4 && !trimmed.startsWith('-')) {
-          const colonIdx = trimmed.indexOf(':');
-          if (colonIdx > 0) {
-            const key = trimmed.slice(0, colonIdx).trim();
-            const value = trimmed.slice(colonIdx + 1).trim();
-
-            if (value) {
-              if (value.startsWith('[') && value.endsWith(']')) {
-                // Parse [a, b, c] array
-                currentItem[key] = value.slice(1, -1).split(',').map(s => s.trim()).filter(s => s).map(s => s.replace(/^["']|["']$/g, ''));
-              } else {
-                currentItem[key] = value.replace(/^["']|["']$/g, '');
-              }
-            } else {
-              // Could be start of nested bullets
-              currentItem[key] = [];
-            }
-          }
-          continue;
-        }
-
-        // Bullets in array item: - "text" (indent 6 or 8)
-        if (currentArray && currentItem && indent >= 6 && trimmed.startsWith('- ')) {
-          const rest = trimmed.slice(2).trim();
-          // Find which key has an array
-          const item = currentItem as Record<string, unknown>;
-          for (const [key, val] of Object.entries(item)) {
-            if (Array.isArray(val)) {
-              const bulletText = rest.replace(/^["']|["']$/g, '');
-              val.push(bulletText);
-              break;
-            }
-          }
-          continue;
-        }
-      }
-
-      // Clean up any dangling multi-line
-      if (multiLineKey && currentItem) {
-        currentItem[multiLineKey] = multiLineContent.join('\n');
-      }
-
-      return result;
+      const doc = YAML.parse(yaml);
+      return doc && typeof doc === "object" && !Array.isArray(doc)
+        ? (doc as Record<string, unknown>)
+        : null;
     } catch (e) {
-      console.error('Parse error:', e);
+      console.error("Parse error:", e);
       return null;
     }
   }
@@ -356,13 +201,15 @@ skills:
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    // Cmd/Ctrl+S compiles the preview (and prevents the browser save dialog).
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
       e.preventDefault();
       if (isValidYaml && !isPreviewLoading) compile();
       return;
     }
     // Auto-indent on Enter, Tab to indent/outdent (the synthetic input event
-    // it fires re-runs validation via the textarea's oninput).
+    // it fires re-runs validation via the textarea's oninput). Clipboard
+    // shortcuts (copy/cut/paste/select-all) are never intercepted.
     handleYamlKeydown(e);
   }
 
@@ -606,7 +453,7 @@ skills:
               class="btn primary compile"
               onclick={compile}
               disabled={!isValidYaml || isPreviewLoading}
-              title="Compile preview (⌘/Ctrl + Enter)"
+              title="Compile preview (⌘/Ctrl + S)"
             >
               {#if isPreviewLoading}
                 <span class="spin"><Icon name="refresh" size={13} /></span> Compiling…

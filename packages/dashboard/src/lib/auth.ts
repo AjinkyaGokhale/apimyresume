@@ -41,3 +41,8 @@ export const authLogin = (username: string, password: string) =>
     body: JSON.stringify({ username, password }),
   });
 export const authLogout = () => send<void>("/auth/logout", { method: "POST" });
+export const authChangePassword = (current_password: string, new_password: string) =>
+  send<void>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password, new_password }),
+  });

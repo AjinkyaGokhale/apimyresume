@@ -116,7 +116,8 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    // Cmd/Ctrl+S compiles the preview (and prevents the browser save dialog).
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (isValidYaml && !previewLoading) compile();
     }
@@ -200,7 +201,7 @@
             class="btn primary compile"
             onclick={compile}
             disabled={!isValidYaml || previewLoading}
-            title="Compile preview (⌘/Ctrl + Enter)"
+            title="Compile preview (⌘/Ctrl + S)"
           >
             {#if previewLoading}
               <span class="spin"><Icon name="refresh" size={13} /></span> Compiling…

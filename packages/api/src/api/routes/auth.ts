@@ -2,10 +2,11 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { conflict, unauthorized } from "../../lib/errors.ts";
+import { badRequest, conflict, unauthorized } from "../../lib/errors.ts";
 import {
   createOwner,
   createSession,
+  deleteOtherSessions,
   deleteSession,
   DUMMY_PASSWORD_HASH,
   findUserByUsername,
@@ -16,6 +17,7 @@ import {
   readSessionCookie,
   sessionCookie,
   clearSessionCookie,
+  updateUserPassword,
   verifyPassword,
 } from "../../lib/auth.ts";
 
@@ -40,6 +42,11 @@ const credsSchema = z.object({
     .max(40, "Username must be at most 40 characters")
     .regex(/^[a-zA-Z0-9_.-]+$/, "Username may only contain letters, digits, _ . -"),
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
+});
+
+const changePasswordSchema = z.object({
+  current_password: z.string().min(1, "Current password is required").max(200),
+  new_password: z.string().min(8, "Password must be at least 8 characters").max(200),
 });
 
 function setSessionCookie(c: Context, sid: string): void {
@@ -107,4 +114,27 @@ authRouter.get("/me", (c) => {
   const user = getUser(session.userId);
   if (!user) throw unauthorized("Not signed in", "not_authenticated");
   return c.json({ username: user.username });
+});
+
+// POST /auth/change-password — session-only. Changes the signed-in owner's
+// password after verifying the current one. Other sessions are revoked; the
+// caller's own session stays valid so the dashboard isn't logged out.
+authRouter.post("/change-password", zValidator("json", changePasswordSchema), async (c) => {
+  const sid = readSessionCookie(c.req.header("cookie"));
+  const session = sid ? getValidSession(sid) : undefined;
+  if (!session) throw unauthorized("Not signed in", "not_authenticated");
+  const user = getUser(session.userId);
+  if (!user) throw unauthorized("Not signed in", "not_authenticated");
+
+  const { current_password, new_password } = c.req.valid("json");
+  if (!(await verifyPassword(current_password, user.passwordHash))) {
+    throw unauthorized("Current password is incorrect", "invalid_credentials");
+  }
+  if (await verifyPassword(new_password, user.passwordHash)) {
+    throw badRequest("New password must be different from the current one", "password_unchanged");
+  }
+
+  await updateUserPassword(user.id, new_password);
+  deleteOtherSessions(user.id, session.id);
+  return c.body(null, 204);
 });

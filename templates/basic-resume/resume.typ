@@ -224,10 +224,10 @@
   = Education
   #for ed in ctx.education.data [
     #edu(
-      institution: ed.institution,
+      institution: ed.at("institution", default: ""),
       location: ed.at("location", default: ""),
-      dates: dates-helper(start-date: "", end-date: ed.period),
-      degree: ed.degree,
+      dates: dates-helper(start-date: "", end-date: ed.at("period", default: "")),
+      degree: ed.at("degree", default: ""),
     )
     #if "bullets" in ed [
       #for b in ed.bullets [
@@ -243,10 +243,10 @@
   = Work Experience
   #for job in ctx.experience.data [
     #work(
-      title: job.role,
+      title: job.at("role", default: ""),
       location: job.at("location", default: ""),
-      company: job.company,
-      dates: dates-helper(start-date: "", end-date: job.period),
+      company: job.at("company", default: ""),
+      dates: dates-helper(start-date: "", end-date: job.at("period", default: "")),
     )
     #for b in job.at("bullets", default: ()) [
       - #b
@@ -261,7 +261,7 @@
   #for p in ctx.projects.data [
     #project(
       role: p.at("role", default: ""),
-      name: p.name,
+      name: p.at("name", default: ""),
       url: p.at("url", default: ""),
       dates: dates-helper(start-date: "", end-date: p.at("period", default: "")),
     )
@@ -282,7 +282,7 @@
   = Extracurricular Activities
   #for ex in ctx.extracurriculars.data [
     #extracurriculars(
-      activity: ex.activity,
+      activity: ex.at("activity", default: ""),
       dates: dates-helper(start-date: "", end-date: ex.at("period", default: "")),
     )
     #if "bullets" in ex [
@@ -299,7 +299,7 @@
   = Certifications
   #for cert in ctx.certifications.data [
     #certificates(
-      name: cert.name,
+      name: cert.at("name", default: ""),
       issuer: cert.at("issuer", default: ""),
       url: cert.at("url", default: ""),
       date: cert.at("date", default: ""),
@@ -312,6 +312,6 @@
 #if "skills" in ctx [
   = Skills
   #for cat in ctx.skills.data [
-    - *#cat.category*: #cat.items.join(", ")
+    - *#cat.at("category", default: "")*: #cat.at("items", default: ()).join(", ")
   ]
 ]

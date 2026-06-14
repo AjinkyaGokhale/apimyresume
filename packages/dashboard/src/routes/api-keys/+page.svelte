@@ -448,4 +448,16 @@
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
+
+  /* Mobile: anchor the section to the top and center it horizontally. */
+  @media (max-width: 860px) {
+    .page-wrap {
+      margin-inline: auto;
+    }
+    .page-head {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+  }
 </style>
