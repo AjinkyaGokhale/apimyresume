@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { eq, lt } from "drizzle-orm";
+import { and, eq, lt, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { config } from "../config.ts";
 import { db } from "../db/index.ts";
@@ -113,6 +113,12 @@ export async function createOwner(username: string, password: string): Promise<U
     .get();
 }
 
+/** Replace a user's password with a freshly hashed value. */
+export async function updateUserPassword(userId: string, password: string): Promise<void> {
+  const passwordHash = await hashPassword(password);
+  db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
+}
+
 // --- Sessions ---
 
 export function createSession(userId: string): SessionRow {
@@ -139,6 +145,15 @@ export function getValidSession(id: string): SessionRow | undefined {
 export function deleteSession(id: string): void {
   if (!id) return;
   db.delete(sessions).where(eq(sessions.id, id)).run();
+}
+
+/**
+ * Revoke every session for a user except the one given. Used after a password
+ * change so any other (possibly compromised) sessions are forced to re-login
+ * while the current dashboard stays signed in.
+ */
+export function deleteOtherSessions(userId: string, exceptId: string): void {
+  db.delete(sessions).where(and(eq(sessions.userId, userId), ne(sessions.id, exceptId))).run();
 }
 
 /** Best-effort cleanup of expired sessions; safe to ignore failures. */

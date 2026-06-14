@@ -1,7 +1,7 @@
 import { baseRepo, resumeRepo } from "../db/repo.ts";
 import { conflict, notFound } from "../lib/errors.ts";
 import { parseOrThrow } from "../lib/validation.ts";
-import { createBaseSchema, kbSchema, updateBaseSchema, type KB } from "../types/kb.ts";
+import { createBaseSchema, kbSchema, type KB } from "../types/kb.ts";
 import { deleteResume, regenerateResume } from "./resume.ts";
 
 /**
@@ -9,6 +9,9 @@ import { deleteResume, regenerateResume } from "./resume.ts";
  * immutable from the perspective of child resumes — updating a base never
  * mutates or auto-re-renders existing children.
  */
+
+/** Folder/display label for a base, derived from the profile: "Name - Title". */
+const displayName = (kb: KB) => [kb.profile.name, kb.profile.title].filter(Boolean).join(" - ");
 
 /** Create a base resume. Rejects a duplicate id with 409. */
 export function createBase(rawBody: unknown) {
@@ -18,7 +21,7 @@ export function createBase(rawBody: unknown) {
   }
   return baseRepo.insert({
     id: kb.id,
-    name: kb.name || kb.profile.name, // use explicit name if provided, else fall back to profile name
+    name: displayName(kb), // derived from profile: "Name - Title"
     template: kb.template,
     templateLock: kb.template_lock,
     data: kb,
@@ -56,26 +59,34 @@ export function updateExperienceBullets(baseId: string, entryId: string, bullets
   const mergedData = { ...existing.data, experience: updatedExperience };
 
   return baseRepo.update(baseId, {
-    name: mergedData.profile.name,
+    name: displayName(mergedData),
     template: mergedData.template,
     templateLock: mergedData.template_lock,
     data: mergedData,
   });
 }
 
-/** Patch a base's KB data. Children are untouched (spec §3). */
+/**
+ * Replace a base's KB data with the full document the editor submits. This
+ * route is owner-only and its sole caller is the dashboard's YAML editor, which
+ * always sends the complete document — so a save is a full replacement, not a
+ * partial merge. Sections the user deletes from the YAML are genuinely removed
+ * (a merge would have silently retained the stored copy). Children are
+ * untouched (spec §3).
+ */
 export function updateBase(id: string, rawBody: unknown) {
   const existing = getBase(id);
-  const patch = parseOrThrow(updateBaseSchema, rawBody);
 
-  // Merge the patch into the stored KB, then re-validate the whole document.
-  const mergedData = kbSchema.parse({ ...existing.data, ...patch, id: existing.id });
+  // Validate the whole submitted document, forcing the id to the path param so
+  // it can't be reassigned by editing the YAML.
+  const body = typeof rawBody === "object" && rawBody !== null ? rawBody : {};
+  const data = kbSchema.parse({ ...body, id: existing.id });
 
   return baseRepo.update(id, {
-    name: mergedData.profile.name,
-    template: mergedData.template,
-    templateLock: mergedData.template_lock,
-    data: mergedData,
+    name: displayName(data),
+    template: data.template,
+    templateLock: data.template_lock,
+    data,
   });
 }
 

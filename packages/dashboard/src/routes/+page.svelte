@@ -122,7 +122,10 @@
     new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
   // The base resume rendered to SVG — same render path as a child's thumbnail.
-  const baseThumb = (id: string) => `${getPublicApiUrl()}/api/v1/bases/${id}/thumbnail.svg`;
+  // The `updated_at` cache-buster forces the browser to refetch after an edit so
+  // the card always shows the latest compiled version.
+  const baseThumb = (base: { id: string; updated_at: string }) =>
+    `${getPublicApiUrl()}/api/v1/bases/${base.id}/thumbnail.svg?v=${encodeURIComponent(base.updated_at)}`;
 </script>
 
 <div class="home-container">
@@ -263,7 +266,7 @@
 
           <div class="thumb">
             <img
-              src={baseThumb(base.id)}
+              src={baseThumb(base)}
               alt=""
               loading="lazy"
               onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")}
