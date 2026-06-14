@@ -92,6 +92,10 @@
     .btn-ghost { background: transparent; color: var(--text); border-color: var(--border-strong); }
     .btn-ghost:hover { background: var(--surface-2); }
     .btn-sm { padding: 9px 16px; font-size: 14px; }
+    /* Keep button text colors inside .nav-links (whose `a` color would otherwise win) */
+    .nav-links a.btn-primary { color: #0f0f0f; }
+    .nav-links a.btn-primary:hover { color: #0f0f0f; }
+    .nav-links a.btn-ghost { color: var(--text); }
 
     /* --- Hero --- */
     .hero { text-align: center; padding: 96px 0 72px; position: relative; overflow: hidden; }
@@ -154,7 +158,8 @@
     .card p { margin: 0; color: var(--muted); font-size: 15px; }
 
     /* --- Steps --- */
-    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .step code { font-family: var(--mono); font-size: 12.5px; color: var(--code); word-break: break-all; }
     .step { position: relative; padding: 26px 24px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
     .step .num {
       font-family: var(--mono); font-size: 13px; color: #0f0f0f; background: #fff;
@@ -193,10 +198,6 @@
     .m-delete { color: #f87171; background: rgba(248, 113, 113, .12); }
     .endpoint .path { font-family: var(--mono); font-size: 13.5px; color: var(--code); }
     .endpoint .desc { color: var(--muted); font-size: 14px; margin-left: auto; text-align: right; }
-    .tag-owner {
-      font-family: var(--font); font-size: 11px; color: var(--muted); margin-left: 8px;
-      border: 1px solid var(--border-strong); border-radius: 999px; padding: 1px 8px;
-    }
     .api-foot { text-align: center; margin-top: 44px; }
 
     /* --- CTA band --- */
@@ -216,6 +217,10 @@
     .footer-inner a { color: var(--muted); font-size: 14px; }
     .footer-inner a:hover { color: var(--text); }
     .copyright { color: var(--muted); font-size: 13px; width: 100%; text-align: center; margin-top: 8px; }
+
+    @media (max-width: 1024px) {
+      .steps { grid-template-columns: repeat(2, 1fr); }
+    }
 
     @media (max-width: 820px) {
       .grid, .steps { grid-template-columns: 1fr; }
@@ -336,23 +341,28 @@ $ curl -X POST https://your-domain/api/v1/resumes \
       <div class="wrap">
         <div class="section-head">
           <h2>How it works</h2>
-          <p>Set up once, then let automation do the tailoring.</p>
+          <p>Set it up once in the dashboard, then drive it from an n8n (or Zapier) workflow that tailors a resume to every job.</p>
         </div>
         <div class="steps">
           <div class="step">
             <div class="num">1</div>
             <h3>Create your base resume</h3>
-            <p>Add your profile, experience, and skills once in the dashboard. It fixes your template and structure.</p>
+            <p>Add your profile, experience, and skills once in the dashboard — your single source of truth. It fixes your template and structure so automation can't break it.</p>
           </div>
           <div class="step">
             <div class="num">2</div>
-            <h3>Connect an AI agent</h3>
-            <p>Your agent reads the base and tailors bullets &amp; keywords to each job description via the API.</p>
+            <h3>Read the base in n8n</h3>
+            <p>An HTTP Request node calls <code>GET /api/v1/bases/{id}/content</code> to pull your experience &amp; skills in a clean, AI-ready shape — plus the job description you're targeting.</p>
           </div>
           <div class="step">
             <div class="num">3</div>
-            <h3>Get a polished PDF</h3>
-            <p>Each tailored version renders to a pixel-perfect PDF, ready to download and send.</p>
+            <h3>Tailor with an AI agent</h3>
+            <p>An AI Agent node (Claude or GPT) compares your base to the job description, then rewrites bullets and picks the keywords that match the role.</p>
+          </div>
+          <div class="step">
+            <div class="num">4</div>
+            <h3>Generate the tailored PDF</h3>
+            <p>A final node posts the agent's output to <code>POST /api/v1/resumes</code> — with <code>inject_bullets</code> and <code>keywords</code> overrides — and gets back a pixel-perfect PDF, ready to send.</p>
           </div>
         </div>
       </div>
@@ -363,48 +373,42 @@ $ curl -X POST https://your-domain/api/v1/resumes \
       <div class="wrap">
         <div class="section-head">
           <h2>A simple REST API</h2>
-          <p>Everything the dashboard does is available over HTTP — ready for AI agents, n8n, and Zapier.</p>
+          <p>Tailor and manage resumes over HTTP — built for AI agents, n8n, and Zapier.</p>
         </div>
 
         <div class="api-auth">
           <strong>Authentication.</strong> Every request to <code>/api/v1/*</code> sends your key in an
           <code>X-API-Key</code> header. Base URL: <code>https://your-domain/api/v1</code>.
-          Endpoints marked <span class="tag-owner">owner</span> require the dashboard owner session and are not
-          available to API keys — agents can read bases and tailor child resumes, but never alter the base structure.
+          With an API key you have full control of <strong>child resumes</strong> and can <strong>read</strong>
+          your base. Editing the base resume itself is done in the dashboard — so an agent can tailor freely
+          without ever altering your master profile.
         </div>
 
         <div class="api-groups">
           <div class="api-group">
-            <h3>Base resumes</h3>
-            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases</span><span class="desc">List all base resumes</span></div>
-            <div class="endpoint"><span class="method m-post">POST</span><span class="path">/bases</span><span class="desc">Create a base resume <span class="tag-owner">owner</span></span></div>
-            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}</span><span class="desc">Get a single base</span></div>
-            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}/content</span><span class="desc">AI-optimised read of base content</span></div>
-            <div class="endpoint"><span class="method m-patch">PATCH</span><span class="path">/bases/{id}</span><span class="desc">Update profile, skills &amp; experience <span class="tag-owner">owner</span></span></div>
-            <div class="endpoint"><span class="method m-patch">PATCH</span><span class="path">/bases/{id}/experience/{entryId}/bullets</span><span class="desc">Replace one job's bullets <span class="tag-owner">owner</span></span></div>
-            <div class="endpoint"><span class="method m-post">POST</span><span class="path">/bases/{id}/regenerate-children</span><span class="desc">Re-render all child PDFs <span class="tag-owner">owner</span></span></div>
-            <div class="endpoint"><span class="method m-delete">DELETE</span><span class="path">/bases/{id}</span><span class="desc">Delete a base <span class="tag-owner">owner</span></span></div>
-          </div>
-
-          <div class="api-group">
-            <h3>Tailored resumes</h3>
+            <h3>Tailored resumes <span class="desc" style="margin:0; font-weight:600;">— the main API surface</span></h3>
             <div class="endpoint"><span class="method m-post">POST</span><span class="path">/resumes</span><span class="desc">Create a tailored child resume</span></div>
-            <div class="endpoint"><span class="method m-post">POST</span><span class="path">/resumes/preview</span><span class="desc">Preview a render without saving</span></div>
-            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/resumes</span><span class="desc">List tailored resumes</span></div>
-            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/resumes/{id}</span><span class="desc">Get a single resume</span></div>
+            <div class="endpoint"><span class="method m-patch">PATCH</span><span class="path">/resumes/{id}</span><span class="desc">Update overrides &amp; re-render a new PDF</span></div>
+            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/resumes</span><span class="desc">List &amp; filter tailored resumes</span></div>
+            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/resumes/{id}</span><span class="desc">Get one resume (add ?expand=true for merged content)</span></div>
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/resumes/{id}/pdf</span><span class="desc">Download the rendered PDF</span></div>
-            <div class="endpoint"><span class="method m-patch">PATCH</span><span class="path">/resumes/{id}</span><span class="desc">Update overrides &amp; re-render</span></div>
             <div class="endpoint"><span class="method m-post">POST</span><span class="path">/resumes/{id}/regenerate</span><span class="desc">Re-render without changes</span></div>
+            <div class="endpoint"><span class="method m-post">POST</span><span class="path">/resumes/preview</span><span class="desc">Preview a render without saving</span></div>
             <div class="endpoint"><span class="method m-delete">DELETE</span><span class="path">/resumes/{id}</span><span class="desc">Delete a resume</span></div>
           </div>
 
           <div class="api-group">
-            <h3>Templates &amp; API keys</h3>
+            <h3>Base resumes <span class="desc" style="margin:0; font-weight:600;">— read-only via API</span></h3>
+            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases</span><span class="desc">List all base resumes</span></div>
+            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}</span><span class="desc">Get a single base</span></div>
+            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}/content</span><span class="desc">AI-optimised read of tailorable content</span></div>
+            <div class="endpoint" style="opacity:.7;"><span class="path" style="color:var(--muted);">Creating &amp; editing a base happens in the dashboard</span></div>
+          </div>
+
+          <div class="api-group">
+            <h3>Templates</h3>
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/templates</span><span class="desc">List available templates</span></div>
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/templates/{id}/thumbnail</span><span class="desc">Template preview image</span></div>
-            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/api-keys</span><span class="desc">List API keys</span></div>
-            <div class="endpoint"><span class="method m-post">POST</span><span class="path">/api-keys</span><span class="desc">Create a key (shown once)</span></div>
-            <div class="endpoint"><span class="method m-delete">DELETE</span><span class="path">/api-keys/{id}</span><span class="desc">Revoke a key</span></div>
           </div>
 
           <div class="api-group">
@@ -424,18 +428,21 @@ $ curl -X POST https://your-domain/api/v1/resumes \
     -H <span class="g">"Content-Type: application/json"</span> \
     -d '{
       "base_id": "john-doe-xxxx",
-      "company": "Acme Corp",
-      "role": "Senior Backend Engineer",
+      "meta": { "company": "Acme Corp", "role": "Senior Backend Engineer" },
       "overrides": {
-        "keywords": ["Go", "Kubernetes"]
+        "keywords": ["Go", "Kubernetes"],
+        "inject_bullets": [
+          { "target": "experience.acme", "mode": "replace",
+            "bullets": ["Scaled Go services on Kubernetes to 10k+ req/s."] }
+        ]
       }
     }'
 
-<span class="g">→ { "id": "resume_xxx", "pdf_url": "/pdfs/resume_xxx_v1.pdf" }</span></pre>
+<span class="g">→ { "id": "resume_xxx", "pdf_url": "/pdfs/resume_xxx_v1.pdf", "version": 1 }</span></pre>
         </div>
 
         <div class="api-foot">
-          <a class="btn btn-ghost" href="https://github.com/AjinkyaGokhale/apimyresume#readme">Read the full API docs</a>
+          <a class="btn btn-ghost" href="https://github.com/AjinkyaGokhale/apimyresume/blob/main/docs/API.md">Read the full API docs</a>
         </div>
       </div>
     </section>
@@ -464,7 +471,7 @@ $ curl -X POST https://your-domain/api/v1/resumes \
         <a href="https://github.com/AjinkyaGokhale/apimyresume">GitHub</a>
         <a href="https://github.com/AjinkyaGokhale/apimyresume#readme">Docs</a>
       </div>
-      <p class="copyright">© 2026 APIMyResume · MIT licensed · A polished resume for every job.</p>
+      <p class="copyright">© 2026 APIMyResume · MIT licensed · A fun project by <a href="https://ajinkyagokhale.com/">Ajinkya Gokhale</a></p>
     </div>
   </footer>
 </body>

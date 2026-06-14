@@ -3,6 +3,8 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
+  "author": "Ajinkya Gokhale",
   "scripts": {
     "dev": "vite dev --port 4321",
     "build": "vite build",

@@ -4,6 +4,8 @@
   "description": "APIMyResume — a polished resume for every job. Turn one profile into beautiful PDF resumes, tailored with an AI agent, n8n, or Zapier.",
   "type": "module",
   "private": true,
+  "license": "MIT",
+  "author": "Ajinkya Gokhale",
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",

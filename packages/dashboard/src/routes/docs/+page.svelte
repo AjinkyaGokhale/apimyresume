@@ -42,12 +42,13 @@
     <section class="card">
       <h2><Icon name="lock" size={16} /> Authentication</h2>
       <p>
-        Send your key in the <code>X-API-Key</code> header. API keys can read bases and
-        create &amp; tailor child resumes. <strong>Base writes</strong> (create / edit / delete a
-        base, regenerate children) and API-key management are <strong>owner-only</strong> — done
-        in the dashboard with the owner session; they return <code>403 owner_only</code> for API
-        keys. Public, no auth: <code>GET /health</code>, <code>GET /schema</code>, rendered PDFs,
-        and <code>*/thumbnail.svg</code> previews.
+        Send your key in the <code>X-API-Key</code> header. API keys have full control of
+        <strong>child resumes</strong> — create, read, tailor, <strong>update</strong>, re-render
+        and delete them — and can <strong>read</strong> base resumes. The base resume itself is
+        managed only by the owner in the dashboard (create / edit / delete); those base-write
+        endpoints and API-key management return <code>403 owner_only</code> for API keys. Public,
+        no auth: <code>GET /health</code>, <code>GET /schema</code>. Rendered PDFs and
+        <code>*/thumbnail.svg</code> previews require auth (owner session or API key).
       </p>
       <pre class="code"><code>curl -H "X-API-Key: YOUR_KEY" {publicApiUrl}/api/v1/bases</code></pre>
     </section>
@@ -55,10 +56,10 @@
     <!-- Base resume endpoints -->
     {#if schema.endpoints?.length}
       <section>
-        <h2 class="section-title">Base resume</h2>
+        <h2 class="section-title">Base resume (read-only via API)</h2>
         <p class="section-sub">
-          The base resume is the canonical knowledge base. Reads are open to API keys; writes are
-          owner-only (managed in the dashboard) — see the auth label on each endpoint.
+          The base resume is the canonical knowledge base. API keys can read it to learn what is
+          tailorable; creating and editing a base is done by the owner in the dashboard.
         </p>
 
         {#each schema.endpoints as ep (ep.method + ep.path)}
@@ -105,7 +106,52 @@
     <!-- Create resume tool -->
     <section>
       <h2 class="section-title">Child resume</h2>
-      <p class="section-sub">{schema.description}</p>
+      <p class="section-sub">
+        Child resumes are the main API surface: a child is a base plus a content-only
+        <code>overrides</code> diff, rendered to its own PDF. Create, list, read, update, re-render
+        and delete them with your API key — see each endpoint below, then the full create/update body.
+      </p>
+
+      {#if schema.child_endpoints?.length}
+        {#each schema.child_endpoints as ep (ep.method + ep.path)}
+          <article class="endpoint">
+            <div class="endpoint-head">
+              <span class="method {ep.method.toLowerCase()}">{ep.method}</span>
+              <code class="path">{ep.path}</code>
+              {#if ep.auth}
+                <span class="auth-chip"><Icon name="lock" size={11} /> {ep.auth}</span>
+              {/if}
+            </div>
+
+            <p class="endpoint-summary">{ep.summary}</p>
+
+            {#if ep.content_type}
+              <div class="kv"><span class="k">Content-Type</span><code>{ep.content_type}</code></div>
+            {/if}
+            {#if ep.body}
+              <div class="kv"><span class="k">Body</span><span class="v">{ep.body}</span></div>
+            {/if}
+
+            {#if ep.notes?.length}
+              <ul class="notes">
+                {#each ep.notes as note}
+                  <li>{note}</li>
+                {/each}
+              </ul>
+            {/if}
+
+            {#if ep.example?.request}
+              <div class="block-label">Example request</div>
+              <pre class="code"><code>{pretty(ep.example.request)}</code></pre>
+            {/if}
+
+            {#if ep.returns}
+              <div class="block-label">Returns</div>
+              <pre class="code"><code>{pretty(ep.returns)}</code></pre>
+            {/if}
+          </article>
+        {/each}
+      {/if}
 
       <article class="endpoint">
         <div class="endpoint-head">
@@ -113,8 +159,9 @@
           <code class="path">/api/v1/resumes</code>
           <span class="auth-chip"><Icon name="lock" size={11} /> X-API-Key</span>
         </div>
+        <p class="endpoint-summary">{schema.description}</p>
 
-        <div class="block-label">Request body</div>
+        <div class="block-label">Create / update body (the <code>overrides</code> object and meta)</div>
         <div class="params">
           {@render propList(schema.parameters.properties ?? {}, schema.parameters.required ?? [])}
         </div>

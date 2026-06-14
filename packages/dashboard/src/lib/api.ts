@@ -115,6 +115,7 @@ export interface SchemaDoc {
   input_schema?: SchemaProp;
   "x-aliases"?: Record<string, string[]>;
   endpoints?: ApiEndpoint[];
+  child_endpoints?: ApiEndpoint[];
 }
 
 export const getSchema = () => api<SchemaDoc>("/schema");

@@ -112,18 +112,17 @@ export function buildSchemaDocument() {
   // that child resumes derive from). Kept alongside the create_resume tool so
   // both live under the single /api/v1/schema discovery document.
   //
-  // AUTH MODEL: base resumes are created and edited only by the human owner via
-  // the dashboard (owner session). All base *writes* below require that session
-  // and return 403 `owner_only` for API-key clients. API keys may READ bases and
-  // create/tailor child resumes (POST /api/v1/resumes) — that is their surface.
-  const ownerOnly = "Owner session (dashboard) — returns 403 for API keys";
+  // AUTH MODEL: child resumes are the API surface — API keys create, read,
+  // tailor, update, re-render and delete them (endpoints below). The base resume
+  // is the canonical source: API keys may READ it (the two GETs below), but it is
+  // created, edited and deleted only by the human owner in the dashboard.
   const baseEndpoints = [
     {
       method: "GET",
       path: "/api/v1/bases/{id}/content",
       summary:
         "Read a base resume's tailorable content (experience, skills, profile summary) " +
-        "in an AI-friendly shape — call this before creating a tailored child.",
+        "in an AI-friendly shape — call this before creating or updating a tailored child.",
       auth: "X-API-Key",
     },
     {
@@ -132,45 +131,84 @@ export function buildSchemaDocument() {
       summary: "Read a base resume. The full KB document is returned under `data`.",
       auth: "X-API-Key",
     },
+  ];
+
+  // Child-resume lifecycle — the primary API surface for AI agents / n8n / Zapier.
+  // All accept the X-API-Key header. A child is a base_id + a content-only
+  // `overrides` diff; every create/update/regenerate re-renders a PDF.
+  const childEndpoints = [
+    {
+      method: "POST",
+      path: "/api/v1/resumes",
+      summary:
+        "Create a tailored child resume from a base and render a PDF. This is the main " +
+        "endpoint — see the full request body under “Child resume” below.",
+      auth: "X-API-Key",
+      content_type: "application/json",
+      returns: { id: "string", pdf_url: "string", version: "number" },
+    },
+    {
+      method: "GET",
+      path: "/api/v1/resumes",
+      summary:
+        "List child resumes. Filter with ?company= , ?tag= , ?base_id= ; paginate with " +
+        "?page= & ?limit= (default 20). Returns { data, pagination }.",
+      auth: "X-API-Key",
+    },
+    {
+      method: "GET",
+      path: "/api/v1/resumes/{id}",
+      summary:
+        "Read one child resume (its stored `overrides` + meta). Add ?expand=true to get the " +
+        "fully merged base+overrides KB that was rendered.",
+      auth: "X-API-Key",
+    },
     {
       method: "PATCH",
-      path: "/api/v1/bases/{id}",
-      summary: "Update a base resume (owner only — structural edits are a human action).",
-      auth: ownerOnly,
+      path: "/api/v1/resumes/{id}",
+      summary: "Update a child's overrides / meta / tags, then re-render a new PDF version.",
+      auth: "X-API-Key",
       content_type: "application/json",
-      body: "A partial KB — every top-level field is optional except `id`, which is immutable.",
+      body: "Any of: `overrides`, `meta` { company, role }, `tags`. All optional.",
       notes: [
-        "Shallow merge: each top-level field you send REPLACES that whole field. " +
-          "To change one item in an array (e.g. a single experience bullet), read the base first, " +
-          "edit the array locally, then PATCH the full array back.",
-        "The base's display name is always derived from `profile.name` — a top-level `name` in the body is ignored on update, so rename via `profile.name`.",
-        "Editing a base does NOT re-render existing child resumes (they keep their stored PDFs). " +
-          "Use POST /api/v1/bases/{id}/regenerate-children to re-render them all with the updated base.",
+        "`overrides` is REPLACED wholesale — it is NOT deep-merged. To change one directive, " +
+          "GET the resume first, edit the complete `overrides` object, then PATCH it all back. " +
+          "Sending `overrides: {}` clears every tailoring and renders the plain base.",
+        "`meta.company`, `meta.role` and `tags` are applied individually — omit a field to leave it unchanged.",
+        "Every successful PATCH re-renders the PDF and bumps `version`; the new file is in `pdf_url`.",
+        "`profile` and `template` are inherited from the base and cannot be changed here.",
       ],
       example: {
         request: {
-          profile: {
-            name: "Max Muster",
-            title: "Senior Software Engineer",
-            email: "max@example.com",
-            summary: "Updated summary line.",
+          meta: { company: "Acme Corp", role: "Senior Backend Engineer" },
+          overrides: {
+            keywords: ["Go", "Kubernetes"],
+            skills_highlight: ["Go", "Kubernetes"],
+            inject_bullets: [
+              { target: "experience.acme", mode: "replace", bullets: ["Scaled Go services on Kubernetes to 10k+ req/s."] },
+            ],
           },
-          skills: [{ category: "Languages", items: ["TypeScript", "Go", "Rust"] }],
         },
       },
     },
     {
       method: "POST",
-      path: "/api/v1/bases/{id}/regenerate-children",
-      summary: "Re-render every child resume using the current base + each child's stored overrides.",
-      auth: ownerOnly,
-      returns: { regenerated: "number", children: ["{ id, pdf_url, version }"] },
+      path: "/api/v1/resumes/{id}/regenerate",
+      summary: "Re-render the child's PDF from its current data (no content change). Bumps `version`.",
+      auth: "X-API-Key",
+      returns: { id: "string", pdf_url: "string", version: "number" },
+    },
+    {
+      method: "GET",
+      path: "/api/v1/resumes/{id}/pdf",
+      summary: "302-redirect to the latest rendered PDF for this child (auth still required).",
+      auth: "X-API-Key",
     },
     {
       method: "DELETE",
-      path: "/api/v1/bases/{id}",
-      summary: "Delete a base. Rejected with 409 if it has children unless `?cascade=true`, which also deletes every child resume and its PDF.",
-      auth: ownerOnly,
+      path: "/api/v1/resumes/{id}",
+      summary: "Delete a child resume and its stored PDF. Returns 204.",
+      auth: "X-API-Key",
     },
   ];
 
@@ -187,8 +225,10 @@ export function buildSchemaDocument() {
     parameters,
     // Anthropic tool_use shape:
     input_schema: parameters,
-    // Human-readable reference for the base-resume management endpoints.
+    // Human-readable reference for the base-resume READ endpoints.
     endpoints: baseEndpoints,
+    // Human-readable reference for the child-resume lifecycle (the API surface).
+    child_endpoints: childEndpoints,
     // Normalizer aliases (spec §17, Appendix D):
     "x-aliases": {
       "overrides.keywords": ["keywords", "key_skills", "skills", "highlight_skills"],
