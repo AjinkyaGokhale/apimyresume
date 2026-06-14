@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { fade } from "svelte/transition";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import YAML from "yaml";
   import Icon from "$lib/Icon.svelte";
   import { getApiKey, getApiUrl } from "$lib/api";
@@ -123,12 +123,15 @@
   }
 
   // Render once automatically when the editor opens; after that it's manual.
+  // The returned teardown revokes the preview blob URL on unmount (using
+  // onMount's cleanup rather than a separate onDestroy, which resolves to the
+  // SSR lifecycle and crashes on client-side navigation).
   onMount(() => {
     void compile();
-  });
 
-  onDestroy(() => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
   });
 
   async function createResume() {
