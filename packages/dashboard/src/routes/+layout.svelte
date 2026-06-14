@@ -48,12 +48,6 @@
     return onResumes || onDocs || onApiKeys || onAuth;
   });
 
-  const settingsItems = [
-    { label: "Profile", icon: "user" },
-    { label: "Preferences", icon: "settings" },
-    { label: "Integrations", icon: "plug" },
-    { label: "Danger Zone", icon: "alert", danger: true },
-  ] as const;
 </script>
 
 {#snippet brand()}
@@ -101,13 +95,6 @@
         <Icon name="lock" size={17} />
         <span class="label">Authentication</span>
       </a>
-      {#each settingsItems as item (item.label)}
-        <span class="nav-item disabled" class:danger={"danger" in item && item.danger}>
-          <Icon name={item.icon} size={17} />
-          <span class="label">{item.label}</span>
-          <span class="soon">soon</span>
-        </span>
-      {/each}
 
       <div class="nav-spacer"></div>
       <button class="nav-item sign-out" type="button" onclick={signOut} aria-label="Sign out">
@@ -150,6 +137,13 @@
     color: var(--muted);
     opacity: 0.7;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Mobile: the sidebar is a slide-out drawer — center the version label. */
+  @media (max-width: 860px) {
+    .app-version {
+      text-align: center;
+    }
   }
 
   .credits :global(.icon) {

@@ -231,4 +231,14 @@
     font-size: 14px;
     z-index: 100;
   }
+
+  /* Mobile: anchor the section to the top and center it horizontally. */
+  @media (max-width: 860px) {
+    .page-wrap {
+      margin-inline: auto;
+    }
+    .page-head {
+      text-align: center;
+    }
+  }
 </style>
