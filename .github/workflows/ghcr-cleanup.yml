@@ -1,0 +1,40 @@
+name: Cleanup GHCR images
+
+# Prunes the container package on ghcr.io so old/untagged image versions don't
+# pile up. Multi-arch safe: the action understands manifest lists, so it never
+# deletes the per-platform sub-manifests that a kept tag (e.g. latest) points to.
+on:
+  schedule:
+    - cron: "0 4 * * 0" # weekly, Sunday 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run (log what would be deleted, delete nothing)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ghcr-cleanup
+  cancel-in-progress: false
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete untagged + old image versions
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          packages: apimyresume
+          # Remove dangling/untagged manifests left behind by each push...
+          delete-untagged: true
+          delete-partial-images: true
+          # ...and keep only the most recent tagged versions (latest is re-pushed
+          # every build, so it always survives).
+          keep-n-tagged: 10
+          # Scheduled runs actually delete; manual runs honour the dry-run input.
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}

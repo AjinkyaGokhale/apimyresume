@@ -60,3 +60,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Don't publish provenance/SBOM attestation manifests — they show up
+          # as untagged digests in GHCR and clutter the package versions list.
+          provenance: false
+          sbom: false
