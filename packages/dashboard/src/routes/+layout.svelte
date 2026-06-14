@@ -35,6 +35,7 @@
   const onResumes = $derived($page.url.pathname === "/" || $page.url.pathname.startsWith("/base/"));
   const onDocs = $derived($page.url.pathname === "/docs");
   const onApiKeys = $derived($page.url.pathname === "/api-keys");
+  const onAuth = $derived($page.url.pathname === "/authentication");
   const isAuthPage = $derived($page.url.pathname === "/login" || $page.url.pathname === "/setup");
   // Auth pages render the slot naked (no sidebar, no top bar).
   const showShell = $derived(!isAuthPage);
@@ -44,13 +45,12 @@
   // `onResumes || (onDocs && !editor)` and leaks editor pages into the constrained column.
   const constrained = $derived.by(() => {
     if (editor) return false;
-    return onResumes || onDocs || onApiKeys;
+    return onResumes || onDocs || onApiKeys || onAuth;
   });
 
   const settingsItems = [
     { label: "Profile", icon: "user" },
     { label: "Preferences", icon: "settings" },
-    { label: "Authentication", icon: "lock" },
     { label: "Integrations", icon: "plug" },
     { label: "Danger Zone", icon: "alert", danger: true },
   ] as const;
@@ -96,6 +96,10 @@
       <a class="nav-item" class:active={onApiKeys} href="/api-keys" onclick={close}>
         <Icon name="key" size={17} />
         <span class="label">API Keys</span>
+      </a>
+      <a class="nav-item" class:active={onAuth} href="/authentication" onclick={close}>
+        <Icon name="lock" size={17} />
+        <span class="label">Authentication</span>
       </a>
       {#each settingsItems as item (item.label)}
         <span class="nav-item disabled" class:danger={"danger" in item && item.danger}>

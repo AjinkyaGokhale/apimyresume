@@ -28,7 +28,10 @@
     [r.company, r.role].filter(Boolean).join(" · ") || r.template;
 
   // Thumbnail is the actual rendered resume (SVG), not a static template image.
-  const thumb = (r: ResumeDto) => `${publicApiUrl}/api/v1/resumes/${r.id}/thumbnail.svg`;
+  // The `version` cache-buster forces a refetch after each recompile so the card
+  // always shows the last compiled resume.
+  const thumb = (r: ResumeDto) =>
+    `${publicApiUrl}/api/v1/resumes/${r.id}/thumbnail.svg?v=${r.version}`;
 
   async function copyPdf(r: ResumeDto) {
     if (!r.pdf_url) return;
