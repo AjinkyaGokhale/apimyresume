@@ -76,6 +76,14 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
   return verifyPasswordSync(plain, hash);
 }
 
+/**
+ * A valid-format scrypt hash of a value no one will submit. Verifying a login
+ * against this when the username is unknown makes the failure path spend the
+ * same ~25ms scrypt work as a wrong-password failure, so response timing no
+ * longer reveals whether a username exists. Computed once at module load.
+ */
+export const DUMMY_PASSWORD_HASH = hashPasswordSync(randomBytes(32).toString("hex"));
+
 // --- Users ---
 
 export function findUserByUsername(username: string): UserRow | undefined {

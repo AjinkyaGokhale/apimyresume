@@ -7,6 +7,7 @@ import {
   createOwner,
   createSession,
   deleteSession,
+  DUMMY_PASSWORD_HASH,
   findUserByUsername,
   getUser,
   getValidSession,
@@ -80,7 +81,11 @@ authRouter.post("/login", zValidator("json", credsSchema), async (c) => {
   if (!hasOwner()) throw conflict("Owner has not been set up yet", "needs_setup");
   const { username, password } = c.req.valid("json");
   const user = findUserByUsername(username);
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  // Always run a scrypt verification — against the real hash if the user exists,
+  // otherwise a dummy — so the response time doesn't reveal whether the username
+  // is valid (user enumeration). The result for the dummy is always false.
+  const ok = await verifyPassword(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+  if (!user || !ok) {
     throw unauthorized("Invalid username or password", "invalid_credentials");
   }
   const session = createSession(user.id);

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { rotateApiKey } from "../../lib/apikey.ts";
 import { workerPool } from "../../render/index.ts";
 import { buildSchemaDocument } from "../../services/schema.ts";
+import { ownerOnly } from "../middleware/auth.ts";
 
 /** Health, schema discovery and key rotation (spec §9, §17, §18). */
 export const misc = new Hono();
@@ -11,4 +12,7 @@ misc.get("/health", (c) => c.json({ ...workerPool.health(), uptime: process.upti
 
 misc.get("/schema", (c) => c.json(buildSchemaDocument()));
 
-misc.post("/auth/rotate-key", (c) => c.json({ api_key: rotateApiKey() }));
+// Rotating the master/legacy key is an owner action — never available to API-key
+// clients (otherwise a key could mint itself a new master key and lock the owner
+// out). Requires the dashboard owner session.
+misc.post("/auth/rotate-key", ownerOnly, (c) => c.json({ api_key: rotateApiKey() }));
