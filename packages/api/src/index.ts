@@ -29,6 +29,10 @@ function boot() {
     port: config.port,
     // Generous idle timeout for slow renders behind the queue.
     idleTimeout: 60,
+    // Hard cap on request body size — rejects oversized uploads at the server
+    // before they reach a handler. readBody() returns a friendly 413 envelope
+    // for the common case; this backstops streamed/chunked bodies.
+    maxRequestBodySize: config.maxBodyBytes,
     fetch: app.fetch,
   });
   log.info(`API listening on http://localhost:${server.port}`);
