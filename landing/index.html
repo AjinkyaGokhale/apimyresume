@@ -133,6 +133,64 @@
     .terminal .c { color: var(--muted); }
     .terminal .g { color: var(--success); }
 
+    /* --- Resume coverflow --- */
+    .coverflow {
+      --cardW: clamp(168px, 30vw, 286px);
+      position: relative;
+      height: calc(var(--cardW) * 1.5);
+      max-width: 960px;
+      margin: 60px auto 0;
+      perspective: 1700px;
+    }
+    .cf-stage {
+      position: absolute; inset: 0; list-style: none; margin: 0; padding: 0;
+      transform-style: preserve-3d;
+    }
+    .cf-item {
+      position: absolute; top: 50%; left: 50%;
+      width: var(--cardW); aspect-ratio: 1 / 1.414;
+      --x: 0px; --s: 1; --rot: 0deg; --op: 0;
+      transform: translate(-50%, -50%) translateX(var(--x)) scale(var(--s)) rotateY(var(--rot));
+      opacity: var(--op);
+      transition: transform .65s cubic-bezier(.32, .72, 0, 1), opacity .55s ease, filter .55s ease;
+      will-change: transform, opacity;
+    }
+    .cf-item[data-off="0"]  { --x: 0%;    --s: 1;   --rot: 0deg;   --op: 1; }
+    .cf-item[data-off="1"]  { --x: 56%;   --s: .82; --rot: -17deg; --op: .6;  filter: brightness(.78); }
+    .cf-item[data-off="-1"] { --x: -56%;  --s: .82; --rot: 17deg;  --op: .6;  filter: brightness(.78); }
+    .cf-item[data-off="2"]  { --x: 100%;  --s: .64; --rot: -21deg; --op: .28; filter: brightness(.58) blur(.5px); }
+    .cf-item[data-off="-2"] { --x: -100%; --s: .64; --rot: 21deg;  --op: .28; filter: brightness(.58) blur(.5px); }
+    .cf-item[data-off="h"]  { --op: 0; --s: .55; transition: none; pointer-events: none; }
+
+    .cf-card {
+      position: relative; width: 100%; height: 100%;
+      border-radius: 12px; overflow: hidden; background: #f4f4ef;
+      border: 1px solid rgba(255, 255, 255, .06);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, .5);
+      cursor: pointer;
+    }
+    .cf-item[data-off="0"] .cf-card {
+      box-shadow: 0 32px 72px rgba(0, 0, 0, .66), 0 0 0 1px rgba(255, 255, 255, .14);
+    }
+    .cf-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+    .cf-card.cf-missing { display: grid; place-items: center; }
+    .cf-card.cf-missing img { display: none; }
+    .cf-card.cf-missing::after {
+      content: attr(data-name); color: #a3a399; font-family: var(--mono);
+      font-size: 12px; letter-spacing: .02em;
+    }
+
+    .cf-dots { display: flex; gap: 9px; justify-content: center; margin-top: 30px; }
+    .cf-dot {
+      width: 7px; height: 7px; padding: 0; border: none; border-radius: 99px;
+      background: var(--border-strong); cursor: pointer;
+      transition: width .25s ease, background .25s ease;
+    }
+    .cf-dot[aria-selected="true"] { width: 22px; background: #fff; }
+    @media (prefers-reduced-motion: reduce) {
+      .cf-item { transition: opacity .3s ease; }
+    }
+
     /* --- Sections --- */
     section { padding: 72px 0; }
     .section-head { text-align: center; max-width: 640px; margin: 0 auto 48px; }
@@ -258,6 +316,18 @@
           <a class="btn btn-ghost" href="#how">See how it works</a>
         </div>
         <p class="hero-note">Spin up the full app — API + dashboard — in a single command.</p>
+
+        <div class="coverflow" aria-roledescription="carousel" aria-label="Example tailored resumes">
+          <ul class="cf-stage">
+            <li class="cf-item"><div class="cf-card" data-name="temp.webp"><img src="resumes/temp.webp" alt="Tailored resume example 1" loading="lazy" onerror="this.closest('.cf-card').classList.add('cf-missing')" /></div></li>
+            <li class="cf-item"><div class="cf-card" data-name="temp.webp"><img src="resumes/temp.webp" alt="Tailored resume example 2" loading="lazy" onerror="this.closest('.cf-card').classList.add('cf-missing')" /></div></li>
+            <li class="cf-item"><div class="cf-card" data-name="temp.webp"><img src="resumes/temp.webp" alt="Tailored resume example 3" loading="lazy" onerror="this.closest('.cf-card').classList.add('cf-missing')" /></div></li>
+            <li class="cf-item"><div class="cf-card" data-name="temp.webp"><img src="resumes/temp.webp" alt="Tailored resume example 4" loading="lazy" onerror="this.closest('.cf-card').classList.add('cf-missing')" /></div></li>
+            <li class="cf-item"><div class="cf-card" data-name="temp.webp"><img src="resumes/temp.webp" alt="Tailored resume example 5" loading="lazy" onerror="this.closest('.cf-card').classList.add('cf-missing')" /></div></li>
+            <li class="cf-item"><div class="cf-card" data-name="temp.webp"><img src="resumes/temp.webp" alt="Tailored resume example 6" loading="lazy" onerror="this.closest('.cf-card').classList.add('cf-missing')" /></div></li>
+          </ul>
+          <div class="cf-dots" role="tablist" aria-label="Choose a resume"></div>
+        </div>
 
         <div class="terminal" aria-hidden="true">
           <div class="terminal-bar">
@@ -467,5 +537,83 @@ $ curl -X POST https://your-domain/api/v1/resumes \
       <p class="copyright">© 2026 APIMyResume · MIT licensed · A polished resume for every job.</p>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      const cf = document.querySelector(".coverflow");
+      if (!cf) return;
+      const stage = cf.querySelector(".cf-stage");
+      const items = Array.from(cf.querySelectorAll(".cf-item"));
+      const dotsWrap = cf.querySelector(".cf-dots");
+      const n = items.length;
+      if (!n) return;
+
+      let active = Math.floor(n / 2);
+      let timer = null;
+      const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      const dots = items.map((_, i) => {
+        const b = document.createElement("button");
+        b.className = "cf-dot";
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.setAttribute("aria-label", "Resume " + (i + 1));
+        b.addEventListener("click", () => { go(i); restart(); });
+        dotsWrap.appendChild(b);
+        return b;
+      });
+
+      function render() {
+        items.forEach((el, i) => {
+          let off = i - active;
+          if (off > n / 2) off -= n;
+          if (off < -n / 2) off += n;
+          // When a card wraps from one edge to the other, move it instantly
+          // (no slide across the whole stage).
+          const prev = el.__off == null ? off : el.__off;
+          if (Math.abs(off - prev) > 2) {
+            el.style.transition = "none";
+            requestAnimationFrame(() => { el.style.transition = ""; });
+          }
+          el.__off = off;
+          el.dataset.off = Math.abs(off) > 2 ? "h" : String(off);
+          el.style.zIndex = String(100 - Math.abs(off));
+          el.querySelector(".cf-card").setAttribute("aria-hidden", off === 0 ? "false" : "true");
+        });
+        dots.forEach((d, i) => d.setAttribute("aria-selected", i === active ? "true" : "false"));
+      }
+
+      function go(i) { active = ((i % n) + n) % n; render(); }
+      function next() { go(active + 1); }
+      function start() { if (reduced) return; stop(); timer = setInterval(next, 3400); }
+      function stop() { if (timer) { clearInterval(timer); timer = null; } }
+      function restart() { stop(); start(); }
+
+      items.forEach((el, i) => {
+        el.querySelector(".cf-card").addEventListener("click", () => {
+          if (i !== active) { go(i); restart(); }
+        });
+      });
+
+      cf.addEventListener("mouseenter", stop);
+      cf.addEventListener("mouseleave", start);
+      cf.addEventListener("focusin", stop);
+      cf.addEventListener("focusout", start);
+      document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()));
+
+      let sx = null;
+      stage.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; stop(); }, { passive: true });
+      stage.addEventListener("touchend", (e) => {
+        if (sx == null) return;
+        const dx = e.changedTouches[0].clientX - sx;
+        if (Math.abs(dx) > 40) { go(active + (dx < 0 ? 1 : -1)); }
+        sx = null;
+        start();
+      });
+
+      render();
+      start();
+    })();
+  </script>
 </body>
 </html>
