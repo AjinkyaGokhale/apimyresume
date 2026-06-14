@@ -1,0 +1,53 @@
+name: Deploy landing
+
+# Deploys the static landing page to S3 (served via CloudFront).
+# Runs only on push to main AND only when something under landing/ changed.
+# `aws s3 sync` additionally uploads just the objects that actually differ.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "landing/**"
+      - ".github/workflows/deploy-landing.yml"
+
+concurrency:
+  group: deploy-landing
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # request the GitHub OIDC token for AWS
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Fingerprintable assets (favicon, logo, font) — long, immutable cache.
+      - name: Sync assets to S3
+        run: |
+          aws s3 sync landing/ "s3://${{ secrets.LANDING_BUCKET }}/" \
+            --delete \
+            --exclude "index.html" \
+            --exclude "README.md" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      # HTML must never be cached, so content changes go live immediately.
+      - name: Upload index.html (no cache)
+        run: |
+          aws s3 cp landing/index.html "s3://${{ secrets.LANDING_BUCKET }}/index.html" \
+            --cache-control "no-cache" \
+            --content-type "text/html"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"
