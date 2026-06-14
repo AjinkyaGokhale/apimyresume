@@ -66,6 +66,9 @@ export const notFound = (message: string, code = "not_found", field?: string) =>
 export const conflict = (message: string, code = "conflict") =>
   new AppError(409, code, message);
 
+export const payloadTooLarge = (message = "Request body too large", code = "payload_too_large") =>
+  new AppError(413, code, message);
+
 export const unprocessable = (
   message: string,
   errors: Array<{ field: string; received: unknown; expected: string }>,

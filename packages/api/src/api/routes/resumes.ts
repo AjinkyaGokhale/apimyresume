@@ -25,14 +25,21 @@ resumes.post("/", async (c) => {
   return c.json(withWarnings(resumeDto(resume), warnings), 201);
 });
 
+/** Parse a query param to a finite number, or undefined (so the repo applies its default/clamp). */
+function num(v: string | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 resumes.get("/", (c) => {
   const q = c.req.query();
   const { rows, total, page, limit, hasNext } = resumeRepo.list({
     company: q.company,
     tag: q.tag,
     baseId: q.base_id,
-    page: q.page ? Number(q.page) : undefined,
-    limit: q.limit ? Number(q.limit) : undefined,
+    page: num(q.page),
+    limit: num(q.limit),
   });
   return c.json({
     data: rows.map(resumeDto),

@@ -112,7 +112,11 @@ export function createApp() {
 
   // --- Dashboard static file serving ---
   app.use("/_app/*", serveStatic({ root: config.dashboardDir }));
+  // Favicons: a root-level `/favicon.ico` plus the full set under `/favicon/`.
+  // `/favicon*` only matches same-segment paths, so the subdirectory needs its
+  // own `/favicon/*` route or requests fall through to the SPA fallback.
   app.use("/favicon*", serveStatic({ root: config.dashboardDir }));
+  app.use("/favicon/*", serveStatic({ root: config.dashboardDir }));
   // Static assets copied verbatim from the dashboard's `static/` dir (logo, etc.).
   app.use("/logo/*", serveStatic({ root: config.dashboardDir }));
 

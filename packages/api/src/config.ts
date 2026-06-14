@@ -82,6 +82,10 @@ export const config = {
   renderWorkers: int("RENDER_WORKERS", defaultWorkers()),
   renderTimeoutMs: int("RENDER_TIMEOUT_MS", 30_000),
 
+  // Maximum request body size. Resume payloads are small JSON/YAML documents;
+  // 1 MB is generous and caps memory use from a hostile authenticated client.
+  maxBodyBytes: int("MAX_BODY_BYTES", 1024 * 1024),
+
   // Per-API-key request budget. Default 120/min is generous for normal
   // automation but stops abuse on a public instance. Set 0 to disable.
   rateLimitPerMinute: int("RATE_LIMIT_PER_MINUTE", 120),
