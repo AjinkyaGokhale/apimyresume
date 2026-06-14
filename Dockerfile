@@ -3,6 +3,9 @@ WORKDIR /dashboard
 COPY packages/dashboard/package.json packages/dashboard/bun.lock* ./
 RUN bun install --frozen-lockfile
 COPY packages/dashboard/ ./
+# Version shown in the dashboard UI — passed from the release tag by CI.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 RUN bun run build
 
 FROM oven/bun:1.3 AS base

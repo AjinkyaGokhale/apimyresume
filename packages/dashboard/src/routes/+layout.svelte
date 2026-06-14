@@ -2,6 +2,7 @@
   import "../app.css";
   import { invalidateAll, goto } from "$app/navigation";
   import { page } from "$app/stores";
+  import { version } from "$app/environment";
   import { authLogout } from "$lib/auth";
   import Icon from "$lib/Icon.svelte";
   import NavLoader from "$lib/NavLoader.svelte";
@@ -110,6 +111,7 @@
         <span class="label">Sign out</span>
       </button>
       <div class="credits">Built with <Icon name="heart" size={14} /> by <span>Ajinkya Gokhale</span></div>
+      <div class="app-version">v{version}</div>
     </aside>
 
     <main class="main" class:constrained={constrained} class:editor={editor}>
@@ -136,6 +138,14 @@
 
   .credits span {
     color: var(--text);
+  }
+
+  .app-version {
+    padding: 0 12px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
   }
 
   .credits :global(.icon) {
