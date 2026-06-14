@@ -1,22 +1,19 @@
-# Hero carousel images
+# Hero marquee images
 
-Drop the resume thumbnails the landing-page hero coverflow uses here:
+The landing-page hero shows a smooth, continuously scrolling strip of resume
+thumbnails. Put the images it uses here.
 
+Currently every card points at `temp.webp`. To use real resumes, replace it (or
+add files and update the `src`s) in the `.mq-track` list in `index.html`:
+
+```html
+<div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
 ```
-resume-1.png
-resume-2.png
-resume-3.png
-resume-4.png
-resume-5.png
-resume-6.png
-```
 
-- **Format:** PNG (or swap the extension in `index.html`; JPG/WebP work too).
-- **Aspect ratio:** A4 portrait — **1 : 1.414** (e.g. 800 × 1131). The card crops to
+- **Format:** WebP / PNG / JPG.
+- **Aspect ratio:** A4 portrait — **1 : 1.414** (e.g. 800 × 1131). Cards crop with
   `object-fit: cover` from the top, so keep the page top-aligned.
-- **Count:** 6 is the default. To use more/fewer, add or remove `<li class="cf-item">`
-  entries in the `.cf-stage` list in `index.html` — the script adapts automatically.
-  (6+ gives the smoothest infinite rotation; the far cards wrap off-screen.)
-
-Until real images are added, each card shows a small filename placeholder so the
-layout still reads correctly.
+- **Count:** Add or remove `<div class="mq-card">` entries to taste — the strip is
+  cloned once at runtime so the loop stays seamless regardless of count.
+- **Speed:** controlled by the `mq-scroll` animation duration in the CSS
+  (`.mq-track { animation: mq-scroll 24s ... }`) — lower = faster.

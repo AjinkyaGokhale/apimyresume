@@ -133,55 +133,33 @@
     .terminal .c { color: var(--muted); }
     .terminal .g { color: var(--success); }
 
-    /* --- Resume coverflow --- */
-    .coverflow {
-      --cardW: clamp(150px, 24vw, 244px);
-      position: relative;
-      height: calc(var(--cardW) * 1.5);
-      max-width: 960px;
-      margin: 0 auto 40px;
-      perspective: 1700px;
+    /* --- Resume marquee --- */
+    .marquee {
+      position: relative; width: 100%;
+      margin: 0 auto 40px; overflow: hidden;
       pointer-events: none; /* purely decorative animation */
+      /* Soft fade at both edges so cards glide in/out instead of popping. */
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+              mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
     }
-    .cf-stage {
-      position: absolute; inset: 0; list-style: none; margin: 0; padding: 0;
-      transform-style: preserve-3d;
+    .mq-track {
+      display: flex; width: max-content;
+      animation: mq-scroll 24s linear infinite;
     }
-    .cf-item {
-      position: absolute; top: 50%; left: 50%;
-      width: var(--cardW); aspect-ratio: 1 / 1.414;
-      --x: 0px; --s: 1; --rot: 0deg; --op: 0;
-      transform: translate(-50%, -50%) translateX(var(--x)) scale(var(--s)) rotateY(var(--rot));
-      opacity: var(--op);
-      transition: transform .85s cubic-bezier(.45, 0, .25, 1), opacity .7s ease, filter .7s ease;
-      will-change: transform, opacity;
-    }
-    .cf-item[data-off="0"]  { --x: 0%;    --s: 1;   --rot: 0deg;   --op: 1; }
-    .cf-item[data-off="1"]  { --x: 56%;   --s: .82; --rot: -17deg; --op: .6;  filter: brightness(.78); }
-    .cf-item[data-off="-1"] { --x: -56%;  --s: .82; --rot: 17deg;  --op: .6;  filter: brightness(.78); }
-    .cf-item[data-off="2"]  { --x: 100%;  --s: .64; --rot: -21deg; --op: .28; filter: brightness(.58) blur(.5px); }
-    .cf-item[data-off="-2"] { --x: -100%; --s: .64; --rot: 21deg;  --op: .28; filter: brightness(.58) blur(.5px); }
-    .cf-item[data-off="h"]  { --op: 0; --s: .55; transition: none; pointer-events: none; }
-
-    .cf-card {
-      position: relative; width: 100%; height: 100%;
+    .mq-card {
+      flex: 0 0 auto; margin-right: 22px;
+      width: clamp(150px, 21vw, 228px); aspect-ratio: 1 / 1.414;
       border-radius: 12px; overflow: hidden; background: #f4f4ef;
-      border: 1px solid rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .08);
       box-shadow: 0 16px 44px rgba(0, 0, 0, .5);
     }
-    .cf-item[data-off="0"] .cf-card {
-      box-shadow: 0 32px 72px rgba(0, 0, 0, .66), 0 0 0 1px rgba(255, 255, 255, .14);
+    .mq-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+    @keyframes mq-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
     }
-    .cf-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
-    .cf-card.cf-missing { display: grid; place-items: center; }
-    .cf-card.cf-missing img { display: none; }
-    .cf-card.cf-missing::after {
-      content: attr(data-name); color: #a3a399; font-family: var(--mono);
-      font-size: 12px; letter-spacing: .02em;
-    }
-
     @media (prefers-reduced-motion: reduce) {
-      .cf-item { transition: opacity .3s ease; }
+      .mq-track { animation: none; }
     }
 
     /* --- Sections --- */
@@ -296,15 +274,15 @@
     <!-- HERO -->
     <section class="hero">
       <div class="wrap">
-        <div class="coverflow" aria-hidden="true">
-          <ul class="cf-stage">
-            <li class="cf-item"><div class="cf-card"><img src="resumes/temp.webp" alt="" /></div></li>
-            <li class="cf-item"><div class="cf-card"><img src="resumes/temp.webp" alt="" /></div></li>
-            <li class="cf-item"><div class="cf-card"><img src="resumes/temp.webp" alt="" /></div></li>
-            <li class="cf-item"><div class="cf-card"><img src="resumes/temp.webp" alt="" /></div></li>
-            <li class="cf-item"><div class="cf-card"><img src="resumes/temp.webp" alt="" /></div></li>
-            <li class="cf-item"><div class="cf-card"><img src="resumes/temp.webp" alt="" /></div></li>
-          </ul>
+        <div class="marquee" aria-hidden="true">
+          <div class="mq-track">
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+          </div>
         </div>
 
         <span class="eyebrow">Self-hosted · Open source · REST API</span>
@@ -532,44 +510,9 @@ $ curl -X POST https://your-domain/api/v1/resumes \
 
   <script>
     (function () {
-      const cf = document.querySelector(".coverflow");
-      if (!cf) return;
-      const items = Array.from(cf.querySelectorAll(".cf-item"));
-      const n = items.length;
-      if (!n) return;
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        // Hold a static composition for users who opt out of motion.
-        items.forEach((el, i) => { el.dataset.off = Math.abs(i - Math.floor(n / 2)) > 2 ? "h" : String(i - Math.floor(n / 2)); el.style.zIndex = String(100 - Math.abs(i - Math.floor(n / 2))); });
-        return;
-      }
-
-      let active = Math.floor(n / 2);
-
-      function render() {
-        items.forEach((el, i) => {
-          let off = i - active;
-          if (off > n / 2) off -= n;
-          if (off < -n / 2) off += n;
-          // A card that wraps to the far side jumps instantly instead of
-          // sliding across the whole strip.
-          const prev = el.__off == null ? off : el.__off;
-          if (Math.abs(off - prev) > 2) {
-            el.style.transition = "none";
-            requestAnimationFrame(() => { el.style.transition = ""; });
-          }
-          el.__off = off;
-          el.dataset.off = Math.abs(off) > 2 ? "h" : String(off);
-          el.style.zIndex = String(100 - Math.abs(off));
-        });
-      }
-
-      render();
-      // Fast, continuous flow — keep stepping while the tab is visible.
-      let timer = setInterval(() => { active = (active + 1) % n; render(); }, 900);
-      document.addEventListener("visibilitychange", () => {
-        clearInterval(timer);
-        if (!document.hidden) timer = setInterval(() => { active = (active + 1) % n; render(); }, 900);
-      });
+      // Duplicate the cards once so the CSS -50% scroll loops seamlessly.
+      const track = document.querySelector(".mq-track");
+      if (track) track.append(...[...track.children].map((c) => c.cloneNode(true)));
     })();
   </script>
 </body>
