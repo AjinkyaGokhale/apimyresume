@@ -119,7 +119,23 @@ skills:
   - category: Backend
     items: [Node.js, FastAPI, GraphQL, PostgreSQL, MongoDB, Redis]
   - category: Cloud & DevOps
-    items: [Docker, Kubernetes, AWS, Terraform, GitHub Actions, CI/CD]`);
+    items: [Docker, Kubernetes, AWS, Terraform, GitHub Actions, CI/CD]
+
+# Custom sections: any title with bullets under it.
+# Optional "after" slots a section under a built-in one
+# (top | education | experience | projects | extracurriculars |
+#  certifications | skills | end). Omit it to render at the bottom.
+custom:
+  - id: publications
+    title: Publications
+    after: experience
+    bullets:
+      - "Muster, M. (2024). Efficient Attention Mechanisms. German AI Conf."
+      - "Co-author of Scalable KV Stores, Journal of Distributed Systems."
+  - id: volunteering
+    title: Volunteering
+    bullets:
+      - "Mentor at CoderDojo Berlin, teaching kids to code (2022 – Present)"`);
 
   const pageTitle = $derived(editingBase ? `Edit base — ${editingBase.name}` : "Create base resume");
   const submitLabel = $derived(editingBase ? "Save changes" : "Create base");

@@ -219,6 +219,28 @@
 
 // ===== Sections =====
 
+// Custom (free-form) sections: any title with bullets under it. Each carries an
+// optional `after` key naming the built-in section it should follow; "top"
+// renders before everything and a missing/`end` key renders at the bottom.
+#let all-customs = if "custom" in ctx { ctx.custom.data } else { () }
+#let render-custom(c) = [
+  = #c.at("title", default: "")
+  #for b in c.at("bullets", default: ()) [
+    - #b
+  ]
+  #v(3pt)
+]
+#let customs-after(key) = {
+  for c in all-customs {
+    let pos = c.at("after", default: "end")
+    if pos == key {
+      render-custom(c)
+    }
+  }
+}
+
+#customs-after("top")
+
 // Education Section
 #if "education" in ctx [
   = Education
@@ -237,6 +259,7 @@
     #v(3pt)
   ]
 ]
+#customs-after("education")
 
 // Work Experience Section
 #if "experience" in ctx [
@@ -254,6 +277,7 @@
     #v(3pt)
   ]
 ]
+#customs-after("experience")
 
 // Projects Section
 #if "projects" in ctx [
@@ -276,6 +300,7 @@
     #v(3pt)
   ]
 ]
+#customs-after("projects")
 
 // Extracurricular Activities Section
 #if "extracurriculars" in ctx [
@@ -293,6 +318,7 @@
     #v(3pt)
   ]
 ]
+#customs-after("extracurriculars")
 
 // Certifications Section
 #if "certifications" in ctx [
@@ -307,6 +333,7 @@
     #v(3pt)
   ]
 ]
+#customs-after("certifications")
 
 // Skills Section
 #if "skills" in ctx [
@@ -315,3 +342,7 @@
     - *#cat.at("category", default: "")*: #cat.at("items", default: ()).join(", ")
   ]
 ]
+#customs-after("skills")
+
+// Custom sections with no placement (or `after: end`) render last.
+#customs-after("end")

@@ -7,10 +7,11 @@
     { "id": "projects", "source": "projects", "label": "Projects", "show_if": "projects.length > 0" },
     { "id": "extracurriculars", "source": "extracurriculars", "label": "Extracurricular Activities", "show_if": "extracurriculars.length > 0" },
     { "id": "certifications", "source": "certifications", "label": "Certifications", "show_if": "certifications.length > 0" },
-    { "id": "skills", "source": "skills", "label": "Skills", "show_if": "skills.length > 0" }
+    { "id": "skills", "source": "skills", "label": "Skills", "show_if": "skills.length > 0" },
+    { "id": "custom", "source": "custom", "label": "", "show_if": "custom.length > 0" }
   ],
   "layout": {
     "type": "single_column",
-    "order": ["header", "education", "experience", "projects", "extracurriculars", "certifications", "skills"]
+    "order": ["header", "education", "experience", "projects", "extracurriculars", "certifications", "skills", "custom"]
   }
 }

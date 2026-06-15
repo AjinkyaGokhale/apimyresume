@@ -72,7 +72,14 @@ export function buildSchemaDocument() {
           extracurriculars: { type: "array", description: "Replace the extracurriculars list for this child." },
           languages: { type: "array", description: "Replace the languages list for this child." },
           awards: { type: "array", description: "Replace the awards list for this child." },
-          custom: { type: "array", description: "Replace the custom sections for this child." },
+          custom: {
+            type: "array",
+            description:
+              "Replace the custom (free-form) sections for this child. Each is a titled section with " +
+              "bullets; optional `after` slots it under a built-in section (top|education|experience|" +
+              "projects|extracurriculars|certifications|skills|end).",
+            example: [{ id: "publications", title: "Publications", after: "experience", bullets: ["Paper A", "Paper B"] }],
+          },
 
           // Tailoring directives.
           keywords: {
