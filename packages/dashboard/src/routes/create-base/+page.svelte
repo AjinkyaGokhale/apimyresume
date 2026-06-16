@@ -25,6 +25,27 @@
   // template here once; child resumes always inherit it (never tailorable).
   let templates = $state<TemplateDto[]>([]);
 
+  // New bases start on a full template gallery; once a template is picked the
+  // YAML editor opens. Editing an existing base skips straight to the editor.
+  let step = $state<"gallery" | "editor">(editingBase ? "editor" : "gallery");
+  let templatesLoading = $state(false);
+  let templatesError = $state<string | null>(null);
+
+  /** Load the available templates for the gallery/picker, tracking errors so a
+   *  failed/expired session shows a retry instead of an endless spinner. */
+  async function loadTemplates() {
+    templatesLoading = true;
+    templatesError = null;
+    try {
+      templates = await listTemplates();
+    } catch (e) {
+      console.error("Failed to load templates:", e);
+      templatesError = e instanceof Error ? e.message : "Failed to load templates";
+    } finally {
+      templatesLoading = false;
+    }
+  }
+
   function baseToYaml(base: NonNullable<typeof editingBase>): string {
     const doc: Record<string, unknown> = {
       name: base.name,
@@ -119,7 +140,23 @@ skills:
   - category: Backend
     items: [Node.js, FastAPI, GraphQL, PostgreSQL, MongoDB, Redis]
   - category: Cloud & DevOps
-    items: [Docker, Kubernetes, AWS, Terraform, GitHub Actions, CI/CD]`);
+    items: [Docker, Kubernetes, AWS, Terraform, GitHub Actions, CI/CD]
+
+# Custom sections: any title with bullets under it.
+# Optional "after" slots a section under a built-in one
+# (top | education | experience | projects | extracurriculars |
+#  certifications | skills | end). Omit it to render at the bottom.
+custom:
+  - id: publications
+    title: Publications
+    after: experience
+    bullets:
+      - "Muster, M. (2024). Efficient Attention Mechanisms. German AI Conf."
+      - "Co-author of Scalable KV Stores, Journal of Distributed Systems."
+  - id: volunteering
+    title: Volunteering
+    bullets:
+      - "Mentor at CoderDojo Berlin, teaching kids to code (2022 – Present)"`);
 
   const pageTitle = $derived(editingBase ? `Edit base — ${editingBase.name}` : "Create base resume");
   const submitLabel = $derived(editingBase ? "Save changes" : "Create base");
@@ -127,14 +164,26 @@ skills:
   /** The template id currently set in the YAML (drives the picker highlight). */
   const currentTemplate = $derived(yamlContent.match(/^template:\s*(.+)$/m)?.[1].trim() ?? "");
 
-  /** Rewrite the top-level `template:` line in the editor, then recompile. */
-  function selectTemplate(id: string) {
-    if (id === currentTemplate) return;
+  /** Set the top-level `template:` line in the YAML to the given id. */
+  function setTemplateLine(id: string) {
     if (/^template:\s*.+$/m.test(yamlContent)) {
       yamlContent = yamlContent.replace(/^template:\s*.+$/m, `template: ${id}`);
     } else {
       yamlContent = `template: ${id}\n${yamlContent}`;
     }
+  }
+
+  /** Rewrite the top-level `template:` line in the editor, then recompile. */
+  function selectTemplate(id: string) {
+    if (id === currentTemplate) return;
+    setTemplateLine(id);
+    if (validateYaml()) void compile();
+  }
+
+  /** Gallery step: pick a template, then open the editor and render once. */
+  function chooseTemplate(id: string) {
+    setTemplateLine(id);
+    step = "editor";
     if (validateYaml()) void compile();
   }
 
@@ -267,10 +316,10 @@ skills:
   // onMount's cleanup rather than a separate onDestroy, which resolves to the
   // SSR lifecycle and crashes on client-side navigation).
   onMount(() => {
-    void compile();
-    listTemplates()
-      .then((t) => (templates = t))
-      .catch((e) => console.error("Failed to load templates:", e));
+    // New bases render only after a template is chosen in the gallery; when
+    // editing we open straight into the editor, so render immediately.
+    if (step === "editor") void compile();
+    void loadTemplates();
 
     return () => {
       if (previewPdfUrl) {
@@ -392,6 +441,61 @@ skills:
     </div>
   {:else}
     <!-- Create base wizard -->
+    {#if step === "gallery"}
+      <!-- Step 1: pick a template -->
+      <header class="detail-head">
+        <button class="btn back" onclick={goBack}>
+          <Icon name="chevron-left" size={16} /> Back
+        </button>
+        <div class="detail-title">
+          <span class="t-company">Choose a template</span>
+          <span class="t-role">Pick a layout for your base resume</span>
+        </div>
+      </header>
+
+      <div class="gallery">
+        {#if templates.length}
+          <div class="gallery-grid">
+            {#each templates as t (t.id)}
+              <button
+                type="button"
+                class="gallery-card"
+                onclick={() => chooseTemplate(t.id)}
+                title={t.description ?? t.name}
+              >
+                <div class="gallery-thumb-wrap">
+                  <img
+                    class="gallery-thumb"
+                    src={`${getApiUrl()}${t.thumbnail_url}`}
+                    alt={t.name}
+                    loading="lazy"
+                  />
+                </div>
+                <div class="gallery-meta">
+                  <span class="gallery-name">{t.name}</span>
+                  {#if t.description}<span class="gallery-desc">{t.description}</span>{/if}
+                </div>
+              </button>
+            {/each}
+          </div>
+        {:else if templatesLoading}
+          <div class="gallery-loading">
+            <span class="spin"><Icon name="refresh" size={28} /></span>
+            <span>Loading templates…</span>
+          </div>
+        {:else}
+          <div class="gallery-loading">
+            <Icon name="alert" size={28} />
+            <span>Couldn't load templates.</span>
+            {#if templatesError}<span class="gallery-err">{templatesError}</span>{/if}
+            <span class="gallery-err-hint">API: {getApiUrl()} — if your session expired, reload the page or log in again.</span>
+            <button class="btn" onclick={() => loadTemplates()}>
+              <Icon name="refresh" size={15} /> Load templates
+            </button>
+          </div>
+        {/if}
+      </div>
+    {:else}
     <header class="detail-head">
       <button class="btn back" onclick={goBack}>
         <Icon name="chevron-left" size={16} /> Back
@@ -401,6 +505,11 @@ skills:
         <span class="t-role">Your canonical profile</span>
       </div>
       <div class="detail-actions">
+        {#if !editingBase}
+          <button class="btn" onclick={() => (step = "gallery")} title="Pick a different template">
+            <Icon name="grid" size={15} /> Change template
+          </button>
+        {/if}
         <button class="btn primary" onclick={createBase} disabled={isCreating || !isValidYaml}>
           {#if isCreating}
             <span class="spin"><Icon name="refresh" size={15} /></span> {editingBase ? "Saving…" : "Creating…"}
@@ -511,6 +620,7 @@ skills:
         </div>
       </section>
     </div>
+    {/if}
   {/if}
 </div>
 
@@ -566,6 +676,109 @@ skills:
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  /* Step 1 — full-size template gallery. */
+  .gallery {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 28px 24px 48px;
+  }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 22px;
+    max-width: 1100px;
+    margin-inline: auto;
+  }
+
+  .gallery-card {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    padding: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+  }
+
+  .gallery-card:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  .gallery-thumb-wrap {
+    aspect-ratio: 17 / 22;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .gallery-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    display: block;
+  }
+
+  .gallery-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px 14px;
+  }
+
+  .gallery-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .gallery-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .gallery-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 80px 24px;
+    color: var(--muted);
+  }
+
+  .gallery-loading .spin {
+    color: var(--accent);
+  }
+
+  .gallery-err {
+    font-size: 12.5px;
+    color: var(--badge-red-text);
+    max-width: 420px;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .gallery-err-hint {
+    font-size: 12px;
+    color: var(--text-soft);
+    max-width: 420px;
+    text-align: center;
   }
 
   .template-strip {

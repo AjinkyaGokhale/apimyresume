@@ -13,6 +13,7 @@ builds on them.
   - [Update a resume](#update-a-resume)
   - [List, read, regenerate, delete](#list-read-regenerate-delete)
   - [Download the PDF](#download-the-pdf)
+- [Cover letters](#cover-letters)
 - [Reading the base resume](#reading-the-base-resume)
 - [Use it with n8n / AI agents](#use-it-with-n8n--ai-agents)
 - [API keys](#api-keys)
@@ -203,6 +204,72 @@ You can also use `GET /api/v1/resumes/{id}/pdf`, which redirects to the latest P
 
 ---
 
+## Cover letters
+
+Each child resume can carry a **matching cover letter**, rendered to its own PDF. You supply
+only the **recipient** and the **letter body** — the author block (your name, contact details,
+location) is taken from the resume's profile, so the resume and its cover letter always share
+one identity. The resume's `company` fills in the recipient's organisation if you don't.
+
+> Cover letters only work when the resume's template ships a cover-letter variant (for example
+> **Clickworthy Resume**). A resume on a template without one returns `422 cover_letter_unsupported`.
+> `GET /api/v1/resumes/{id}` reports `has_cover_letter` so you can check first.
+
+### Set or replace the cover letter
+
+`PUT /api/v1/resumes/{id}/cover-letter`
+
+```bash
+curl -X PUT http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "addressee": {
+      "name": "Dr. Jane Smith",
+      "institution": "Acme Corp",
+      "city": "Tech City", "state": "CA", "zip": "90210", "country": "USA"
+    },
+    "body": {
+      "intro": "I am writing to apply for the Senior Backend Engineer position.",
+      "paragraphs": [
+        "At Acme I scaled Go services on Kubernetes to 10k+ req/s.",
+        "I thrive in distributed-systems work and cross-team collaboration."
+      ],
+      "closing": "Thank you for considering my application.",
+      "signoff": "Sincerely"
+    }
+  }'
+```
+
+- `addressee.name` is required; the rest of the address block is optional. `institution`
+  defaults to the resume's `company`.
+- `body` fields are plain text. `paragraphs` is a list; the salutation (“Dear …,”) and your
+  signature are added automatically. `date` is optional and defaults to today.
+
+### Read, render, remove
+
+```bash
+# Read the stored cover letter
+curl http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter -H "X-API-Key: your-key"
+
+# Download the cover-letter PDF (rendered on demand)
+curl http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter/pdf \
+  -H "X-API-Key: your-key" -o cover-letter.pdf
+
+# Preview a letter without saving it (same body shape as PUT)
+curl -X POST http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter/preview \
+  -H "X-API-Key: your-key" -H "Content-Type: application/json" \
+  -d @cover-letter.json -o preview.pdf
+
+# Remove the cover letter
+curl -X DELETE http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter -H "X-API-Key: your-key"
+```
+
+One identity, two documents — fully automatable: create the child resume, `PUT` its cover
+letter, then `GET` both PDFs.
+
+---
+
 ## Reading the base resume
 
 You can't *edit* the base with an API key, but you can *read* it — useful so an AI agent knows
@@ -228,7 +295,10 @@ APIMyResume is built for automation. The usual flow:
    picks keywords, etc.
 3. **Create the child** → `POST /api/v1/resumes`
    The response has the `pdf_url` of the finished resume.
-4. **(Optional) Refine it later** → `PATCH /api/v1/resumes/{id}`
+4. **(Optional) Add a cover letter** → `PUT /api/v1/resumes/{id}/cover-letter`
+   The agent writes the recipient + body; the author identity comes from the resume. Then
+   `GET /api/v1/resumes/{id}/cover-letter/pdf` for the letter PDF.
+5. **(Optional) Refine it later** → `PATCH /api/v1/resumes/{id}`
    A new PDF version is rendered.
 
 > Your base is never touched by automation. Creating or editing a base is an owner action in

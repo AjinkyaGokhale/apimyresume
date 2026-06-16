@@ -11,9 +11,16 @@
   const publicApiUrl = getPublicApiUrl();
 
   const profile = $derived((data.base.data?.profile ?? {}) as Record<string, unknown>);
-  const profileLinks = $derived((profile.links ?? {}) as Record<string, string>);
+  // Header label is derived from the profile ("Name - Title"), falling back to
+  // the base name/id when the profile has no name.
+  const baseTitle = $derived(
+    [profile.name, profile.title].filter(Boolean).join(" - ") ||
+      data.base.name ||
+      "Unnamed Base",
+  );
 
   let view = $state<"grid" | "list">($page.url.searchParams.get("view") === "list" ? "list" : "grid");
+  let sort = $state<"date" | "name">("date");
   let busy = $state<string | null>(null);
   let openMenu = $state<string | null>(null);
   let toast = $state<string | null>(null);
@@ -27,6 +34,14 @@
   const resumeName = (r: ResumeDto) =>
     [r.company, r.role].filter(Boolean).join(" · ") || r.template;
 
+  const sortedChildren = $derived(
+    [...data.children].sort((a, b) =>
+      sort === "name"
+        ? resumeName(a).localeCompare(resumeName(b), undefined, { sensitivity: "base" })
+        : new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    ),
+  );
+
   // Thumbnail is the actual rendered resume (SVG), not a static template image.
   // The `version` cache-buster forces a refetch after each recompile so the card
   // always shows the last compiled resume.
@@ -37,6 +52,11 @@
     if (!r.pdf_url) return;
     await navigator.clipboard.writeText(`${publicApiUrl}${r.pdf_url}`);
     showToast("PDF link copied");
+  }
+
+  async function copyBaseId() {
+    await navigator.clipboard.writeText(data.base.id);
+    showToast("Base resume ID copied");
   }
 
   const fmtDate = (iso: string) =>
@@ -50,7 +70,7 @@
   <nav class="breadcrumb" aria-label="Breadcrumb">
     <a class="crumb" href="/"><Icon name="chevron-left" size={15} /> Overview</a>
     <span class="crumb-sep">/</span>
-    <span class="crumb current">{data.base.name || "Unnamed Base"}</span>
+    <span class="crumb current">{baseTitle}</span>
   </nav>
 
   <!-- Folder header -->
@@ -58,7 +78,7 @@
     <div class="folder-title">
       <span class="folder-icon"><Icon name="folder-open" size={26} /></span>
       <div class="folder-meta">
-        <h1>{data.base.name || "Unnamed Base"}</h1>
+        <h1>{baseTitle}</h1>
         <p>
           {data.base.template} <span class="divider">•</span>
           {data.children.length} child{data.children.length === 1 ? "" : "ren"}
@@ -74,6 +94,13 @@
       <button class="btn red" onclick={() => goto(`/base/${data.base.id}/new`)}>
         <Icon name="plus" size={15} /> New resume
       </button>
+      <label class="sort">
+        <span class="sort-label">Sort by</span>
+        <select bind:value={sort} aria-label="Sort child resumes by">
+          <option value="date">Date</option>
+          <option value="name">Name</option>
+        </select>
+      </label>
       <div class="view-toggle" role="group" aria-label="View mode">
         <button class:active={view === "grid"} onclick={() => (view = "grid")} aria-label="Grid view" title="Grid view">
           <Icon name="grid" size={17} />
@@ -85,22 +112,13 @@
     </div>
   </header>
 
-  {#if profile.name}
-    <div class="profile-strip">
-      <div class="ps-name">
-        <span class="ps-fullname">{profile.name}</span>
-        {#if profile.title}<span class="ps-title">{profile.title}</span>{/if}
-      </div>
-      <div class="ps-meta">
-        {#if profile.email}<span>{profile.email}</span>{/if}
-        {#if profile.phone}<span>{profile.phone}</span>{/if}
-        {#if profile.location}<span>{profile.location}</span>{/if}
-        {#each Object.values(profileLinks).filter(Boolean) as link}
-          <span>{link}</span>
-        {/each}
-      </div>
-    </div>
-  {/if}
+  <div class="id-strip">
+    <span class="id-label">Base resume ID</span>
+    <button class="id-value" onclick={() => copyBaseId()} title="Copy base resume ID">
+      <code>{data.base.id}</code>
+      <Icon name="copy" size={14} />
+    </button>
+  </div>
 
   {#if data.children.length === 0}
     <div class="empty">
@@ -113,7 +131,7 @@
     </div>
   {:else}
     <div class:grid={view === "grid"} class:list={view === "list"}>
-      {#each data.children as r (r.id)}
+      {#each sortedChildren as r (r.id)}
         <article class="card child-card">
           <button
             class="kebab"
@@ -292,6 +310,32 @@
     border-color: var(--border-strong);
   }
 
+  .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sort-label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .sort select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.12s;
+  }
+
+  .sort select:hover {
+    border-color: var(--border-strong);
+  }
+
   .view-toggle {
     display: flex;
     border: 1px solid var(--border);
@@ -337,35 +381,45 @@
     color: var(--border-strong);
   }
 
-  .profile-strip {
+  .id-strip {
     padding: 10px 24px 12px;
+    margin-bottom: 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 10px;
   }
 
-  .ps-name {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-  }
-
-  .ps-fullname {
+  .id-label {
+    font-size: 12px;
     font-weight: 600;
-    font-size: 14px;
-  }
-
-  .ps-title {
-    font-size: 13px;
     color: var(--muted);
   }
 
-  .ps-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 12px;
-    font-size: 12px;
+  .id-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  .id-value:hover {
+    background: var(--surface);
+    border-color: var(--border-strong);
+  }
+
+  .id-value code {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 12.5px;
+  }
+
+  .id-value :global(svg) {
     color: var(--muted);
   }
 

@@ -72,7 +72,14 @@ export function buildSchemaDocument() {
           extracurriculars: { type: "array", description: "Replace the extracurriculars list for this child." },
           languages: { type: "array", description: "Replace the languages list for this child." },
           awards: { type: "array", description: "Replace the awards list for this child." },
-          custom: { type: "array", description: "Replace the custom sections for this child." },
+          custom: {
+            type: "array",
+            description:
+              "Replace the custom (free-form) sections for this child. Each is a titled section with " +
+              "bullets; optional `after` slots it under a built-in section (top|education|experience|" +
+              "projects|extracurriculars|certifications|skills|end).",
+            example: [{ id: "publications", title: "Publications", after: "experience", bullets: ["Paper A", "Paper B"] }],
+          },
 
           // Tailoring directives.
           keywords: {
@@ -208,6 +215,50 @@ export function buildSchemaDocument() {
       method: "DELETE",
       path: "/api/v1/resumes/{id}",
       summary: "Delete a child resume and its stored PDF. Returns 204.",
+      auth: "X-API-Key",
+    },
+    {
+      method: "PUT",
+      path: "/api/v1/resumes/{id}/cover-letter",
+      summary:
+        "Set or replace this resume's cover letter. You supply only the recipient and the " +
+        "letter content — the author identity (name, contacts, location) is taken from the " +
+        "resume's profile. Only works when the resume's template provides a cover-letter " +
+        "variant (else 422 cover_letter_unsupported).",
+      auth: "X-API-Key",
+      content_type: "application/json",
+      body:
+        "{ addressee: { name (required), institution?, address?, city?, state?, country?, zip? }, " +
+        "body: { intro, paragraphs: string[], closing, signoff }, date? }. " +
+        "addressee.institution defaults to the resume's company; date defaults to today.",
+      example: {
+        request: {
+          addressee: { name: "Dr. Jane Smith", institution: "Acme Corp", city: "Tech City", state: "CA", zip: "90210" },
+          body: {
+            intro: "I am writing to apply for the Senior Backend Engineer position.",
+            paragraphs: ["During my time at Nineti, I scaled Go services on Kubernetes to 10k+ req/s."],
+            closing: "Thank you for considering my application.",
+            signoff: "Sincerely",
+          },
+        },
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/v1/resumes/{id}/cover-letter",
+      summary: "Read the stored cover letter (404 when none set).",
+      auth: "X-API-Key",
+    },
+    {
+      method: "GET",
+      path: "/api/v1/resumes/{id}/cover-letter/pdf",
+      summary: "Render the stored cover letter to a PDF (application/pdf). 404 when none set.",
+      auth: "X-API-Key",
+    },
+    {
+      method: "DELETE",
+      path: "/api/v1/resumes/{id}/cover-letter",
+      summary: "Remove the stored cover letter. Returns 204.",
       auth: "X-API-Key",
     },
   ];

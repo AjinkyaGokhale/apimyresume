@@ -3,7 +3,10 @@ import { readBody } from "../body.ts";
 import { resumeDto } from "../dto.ts";
 import { resumeRepo } from "../../db/repo.ts";
 import { notFound } from "../../lib/errors.ts";
+import { templateRegistry } from "../../templates/registry.ts";
+import { coverLetter } from "./cover-letter.ts";
 import { previewFromData } from "../../services/preview.ts";
+import type { CoverLetter } from "../../types/coverletter.ts";
 import {
   createResume,
   deleteResume,
@@ -52,7 +55,13 @@ resumes.get("/:id", (c) => {
   if (c.req.query("expand") === "true") return c.json(expandResume(id));
   const row = resumeRepo.get(id);
   if (!row) throw notFound(`Resume '${id}' not found`, "resume_not_found");
-  return c.json(resumeDto(row));
+  // Enrich with cover-letter availability so the dashboard can gate the editor
+  // tab and pre-load any stored letter without an extra round-trip.
+  return c.json({
+    ...resumeDto(row),
+    has_cover_letter: templateRegistry.get(row.template)?.hasCoverLetter ?? false,
+    cover_letter: (row.coverLetter as CoverLetter | null) ?? null,
+  });
 });
 
 resumes.patch("/:id", async (c) => {
@@ -96,3 +105,7 @@ resumes.post("/preview", async (c) => {
   }
   return c.body(pdf.buffer as ArrayBuffer);
 });
+
+// Cover letter sub-resource: /resumes/:id/cover-letter[...]. The `:id` param
+// propagates into the mounted router.
+resumes.route("/:id/cover-letter", coverLetter);

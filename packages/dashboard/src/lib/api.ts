@@ -1,5 +1,5 @@
 // dashboard/src/lib/api.ts
-import type { Pagination, ResumeDto } from "$lib/types";
+import type { CoverLetter, Pagination, ResumeDto } from "$lib/types";
 
 /** Reads bootstrap config injected by the Hono server into index.html. Falls back to Vite env vars for local dev. */
 export function getApiKey(): string {
@@ -61,6 +61,18 @@ export function listResumes(params: {
 }
 
 export const getResume = (id: string) => api<ResumeDto>(`/resumes/${id}`);
+
+/** Set or replace a resume's cover letter (addressee + body). */
+export const putCoverLetter = (id: string, payload: unknown) =>
+  api<{ cover_letter: CoverLetter }>(`/resumes/${id}/cover-letter`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+/** Remove a resume's cover letter. */
+export const deleteCoverLetter = (id: string) =>
+  api<void>(`/resumes/${id}/cover-letter`, { method: "DELETE" });
 export const expandResume = (id: string) => api<Record<string, unknown>>(`/resumes/${id}?expand=true`);
 export const regenerate = (id: string) => api<ResumeDto>(`/resumes/${id}/regenerate`, { method: "POST" });
 export const deleteResume = (id: string) => api<void>(`/resumes/${id}`, { method: "DELETE" });

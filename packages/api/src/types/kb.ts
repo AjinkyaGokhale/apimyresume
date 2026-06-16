@@ -86,15 +86,18 @@ export const awardSchema = z.object({
   description: z.string().optional(),
 });
 
+/**
+ * A free-form section: any title with a list of bullets under it. `after` slots
+ * it directly beneath a built-in section (e.g. "experience"); omit it (or use
+ * "end") to render at the bottom, or "top" to render before everything.
+ * Built-in placement keys: top | education | experience | projects |
+ * extracurriculars | certifications | skills | end.
+ */
 export const customSectionSchema = z.object({
   id: z.string(),
   title: z.string(),
-  entries: z.array(
-    z.object({
-      label: z.string().optional(),
-      value: z.string(),
-    }),
-  ),
+  bullets: z.array(z.string()).default([]),
+  after: z.string().optional(),
 });
 
 export const extracurricularSchema = z.object({

@@ -1,4 +1,5 @@
 import type { BaseRow, ResumeRow } from "../db/schema.ts";
+import type { CoverLetter } from "../types/coverletter.ts";
 
 /** Public API representation of a child resume (spec §6). */
 export function resumeDto(row: ResumeRow) {
@@ -15,6 +16,11 @@ export function resumeDto(row: ResumeRow) {
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   };
+}
+
+/** Public API representation of a stored cover letter (or null when absent). */
+export function coverLetterDto(coverLetter: CoverLetter | null) {
+  return { cover_letter: coverLetter };
 }
 
 /** Public API representation of a base resume (spec §3). */

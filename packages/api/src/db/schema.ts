@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import type { KB } from "../types/kb.ts";
 import type { Overrides } from "../types/overrides.ts";
+import type { CoverLetter } from "../types/coverletter.ts";
 
 /**
  * Drizzle schema (spec §12). SQLite is the only stateful dependency for a
@@ -41,6 +42,8 @@ export const resumes = sqliteTable(
     tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
     /** Diff-only override payload (normalised canonical shape). */
     overrides: text("overrides", { mode: "json" }).$type<Overrides>().notNull().default({}),
+    /** Optional cover letter (addressee + body) for this child resume. */
+    coverLetter: text("cover_letter", { mode: "json" }).$type<CoverLetter>(),
     /** Current PDF version counter; render N produces `<id>_vN.pdf`. */
     version: integer("version").notNull().default(0),
     pdfPath: text("pdf_path"),
