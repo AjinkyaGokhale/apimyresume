@@ -65,12 +65,21 @@ class TemplateRegistry {
 
       const missingPackages = this.checkVendoredPackages(id, source);
 
+      // Optional cover-letter variant: a self-contained cover-letter.typ that
+      // reads the cover letter context from sys.inputs (spec: cover letters).
+      const coverLetterPath = path.join(tplDir, "cover-letter.typ");
+      const coverLetterSource = existsSync(coverLetterPath)
+        ? readFileSync(coverLetterPath, "utf8")
+        : undefined;
+
       const tpl: RegisteredTemplate = {
         id,
         dir: tplDir,
         config: config_,
         map,
         source,
+        coverLetterSource,
+        hasCoverLetter: coverLetterSource !== undefined,
         hasThumbnail: existsSync(path.join(tplDir, "thumbnail.png")),
         missingPackages,
         renderable: missingPackages.length === 0,
@@ -132,6 +141,7 @@ class TemplateRegistry {
       thumbnail_url: `/api/v1/templates/${t.id}/thumbnail`,
       paper_size: t.config.paperSize,
       engine: t.config.engine,
+      has_cover_letter: t.hasCoverLetter,
     }));
   }
 

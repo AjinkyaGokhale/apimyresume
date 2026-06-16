@@ -45,6 +45,11 @@ export interface RegisteredTemplate {
   map: TemplateMap;
   /** resume.typ content, read once at load time and reused via addSource. */
   source: string;
+  /** Optional cover-letter.typ content — present only for templates that ship a
+   * cover-letter variant. Drives the cover letter endpoints. */
+  coverLetterSource?: string;
+  /** Whether this template ships a renderable cover-letter variant. */
+  hasCoverLetter: boolean;
   hasThumbnail: boolean;
   /** Vendored typst packages imported by resume.typ that are missing from cache. */
   missingPackages: string[];
@@ -60,4 +65,6 @@ export interface TemplateSummary {
   thumbnail_url: string;
   paper_size: string;
   engine: string;
+  /** Whether this template can also render a cover letter. */
+  has_cover_letter: boolean;
 }

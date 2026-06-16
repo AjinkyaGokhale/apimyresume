@@ -29,6 +29,7 @@ export function migrate(): void {
       role       TEXT,
       tags       TEXT NOT NULL DEFAULT '[]',
       overrides  TEXT NOT NULL DEFAULT '{}',
+      cover_letter TEXT,
       version    INTEGER NOT NULL DEFAULT 0,
       pdf_path   TEXT,
       pdf_url    TEXT,
@@ -91,6 +92,14 @@ export function migrate(): void {
     .all() as Array<{ name: string }>;
   if (!apiKeyCols.some((c) => c.name === "user_id")) {
     sqlite.exec("ALTER TABLE api_keys ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE;");
+  }
+
+  // Upgrade path: databases created before cover letters lack resumes.cover_letter.
+  const resumeCols = sqlite
+    .query("PRAGMA table_info(resumes)")
+    .all() as Array<{ name: string }>;
+  if (!resumeCols.some((c) => c.name === "cover_letter")) {
+    sqlite.exec("ALTER TABLE resumes ADD COLUMN cover_letter TEXT;");
   }
 
   sqlite.exec(`

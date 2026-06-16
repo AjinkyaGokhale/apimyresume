@@ -21,6 +21,30 @@ export async function renderToPdf(
   return { pdf: out.pdf, warnings: out.warnings };
 }
 
+/**
+ * Render a cover letter to a PDF buffer. Unlike resumes, the cover letter
+ * context is built by the caller (it merges the resume profile with the stored
+ * addressee + body) and serialised to JSON, so we bypass the field mapper and
+ * feed the context straight to the template's cover-letter.typ. The compiler's
+ * `resume` input key is reused as the generic document-context input.
+ */
+export async function renderCoverLetterToPdf(
+  template: RegisteredTemplate,
+  contextJson: string,
+): Promise<{ pdf: Uint8Array; warnings: string[] }> {
+  if (!template.coverLetterSource) {
+    throw new Error(`Template '${template.id}' has no cover-letter variant`);
+  }
+  const out = await workerPool.render({
+    templateId: template.id,
+    source: template.coverLetterSource,
+    resumeJson: contextJson,
+    format: "pdf",
+  });
+  if (!out.pdf) throw new Error("Render produced no PDF buffer");
+  return { pdf: out.pdf, warnings: out.warnings };
+}
+
 /** Render a merged document to a static SVG (used for card thumbnails). */
 export async function renderToSvg(template: RegisteredTemplate, merged: MergedDoc): Promise<string> {
   const out = await dispatch(template, merged, "svg");
