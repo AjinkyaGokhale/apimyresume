@@ -12,6 +12,10 @@
 
   const pdfHref = $derived(r.pdf_url ? `${getApiUrl()}${r.pdf_url}` : "");
 
+  /** Editor mode: tailor the resume, or write its cover letter. */
+  let mode = $state<"resume" | "cover">("resume");
+  const hasCoverLetter = $derived(r.has_cover_letter ?? false);
+
   /** Editable content sections, in display order (mirrors the API's overridesSchema). */
   const EDITABLE_SECTIONS = [
     "experience",
@@ -152,14 +156,6 @@
     onInput();
   }
 
-  $effect(() => {
-    runPreview();
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-    };
-  });
-
   async function saveAndRegenerate() {
     let parsed: Record<string, unknown>;
     try {
@@ -199,6 +195,157 @@
       saving = false;
     }
   }
+
+  // ===== Cover letter mode =====
+
+  /** Seed the cover-letter YAML from the stored letter, or a starter scaffold. */
+  function buildCoverLetterYaml(resume: ResumeDto): string {
+    if (resume.cover_letter) return YAML.stringify(resume.cover_letter, { lineWidth: 0 });
+    return YAML.stringify(
+      {
+        addressee: {
+          name: "",
+          institution: resume.company ?? "",
+          address: "",
+          city: "",
+          state: "",
+          zip: "",
+          country: "",
+        },
+        body: { intro: "", paragraphs: [""], closing: "", signoff: "Sincerely" },
+      },
+      { lineWidth: 0 },
+    );
+  }
+
+  let clYaml = $state(buildCoverLetterYaml(r));
+  let clError = $state<string | null>(null);
+  let clValidYaml = $state(true);
+  let clPreviewUrl = $state("");
+  let clPreviewLoading = $state(false);
+  let clSaving = $state(false);
+  let clDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function runClPreview() {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = YAML.parse(clYaml) ?? {};
+      clError = null;
+      clValidYaml = true;
+    } catch (e) {
+      clError = (e as Error).message;
+      clValidYaml = false;
+      return;
+    }
+
+    clPreviewLoading = true;
+    try {
+      const res = await fetch(`${getApiUrl()}/api/v1/resumes/${r.id}/cover-letter/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": getApiKey() },
+        body: JSON.stringify(parsed),
+      });
+      if (!res.ok) {
+        clError = (await res.text()) || `Preview failed (${res.status})`;
+        clValidYaml = false;
+        return;
+      }
+      clError = null;
+      clValidYaml = true;
+      const blob = await res.blob();
+      if (clPreviewUrl.startsWith("blob:")) URL.revokeObjectURL(clPreviewUrl);
+      clPreviewUrl = URL.createObjectURL(blob);
+    } catch (e) {
+      clError = String(e);
+    } finally {
+      clPreviewLoading = false;
+    }
+  }
+
+  function onClInput() {
+    try {
+      YAML.parse(clYaml);
+      clError = null;
+      clValidYaml = true;
+    } catch (e) {
+      clError = (e as Error).message;
+      clValidYaml = false;
+    }
+    if (clDebounceTimer) clearTimeout(clDebounceTimer);
+    if (!clValidYaml) return;
+    clDebounceTimer = setTimeout(runClPreview, 500);
+  }
+
+  function onClFormat() {
+    const pretty = formatYaml(clYaml);
+    if (pretty == null) {
+      showToast("Fix YAML errors before formatting");
+      return;
+    }
+    clYaml = pretty;
+    onClInput();
+  }
+
+  async function saveCoverLetter() {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = YAML.parse(clYaml) ?? {};
+    } catch (e) {
+      clError = (e as Error).message;
+      return;
+    }
+
+    clSaving = true;
+    try {
+      const res = await fetch(`${getApiUrl()}/api/v1/resumes/${r.id}/cover-letter`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-API-Key": getApiKey() },
+        body: JSON.stringify(parsed),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Failed to save cover letter");
+      }
+      showToast("Cover letter saved");
+    } catch (e) {
+      clError = String(e).replace(/^Error: /, "");
+    } finally {
+      clSaving = false;
+    }
+  }
+
+  async function downloadCoverLetter() {
+    try {
+      const res = await fetch(`${getApiUrl()}/api/v1/resumes/${r.id}/cover-letter/pdf`, {
+        headers: { "X-API-Key": getApiKey() },
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${r.company ?? "cover-letter"}-${r.role ?? r.template}-cover-letter.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      clError = String(e).replace(/^Error: /, "");
+    }
+  }
+
+  // Run the active mode's preview when the page mounts or the mode switches.
+  $effect(() => {
+    if (mode === "cover") {
+      if (hasCoverLetter) runClPreview();
+    } else {
+      runPreview();
+    }
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (clDebounceTimer) clearTimeout(clDebounceTimer);
+      if (previewUrl.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+      if (clPreviewUrl.startsWith("blob:")) URL.revokeObjectURL(clPreviewUrl);
+    };
+  });
 </script>
 
 <div class="detail">
@@ -214,66 +361,153 @@
       <span class="t-company">{r.company ?? "Resume"}</span>
       <span class="t-role">{r.role ?? r.template} · base: {r.base_id}</span>
     </div>
-    <div class="detail-actions">
-      <button class="btn" onclick={saveAndRegenerate} disabled={saving || !isValidYaml}>
-        {#if saving}
-          <span class="spin"><Icon name="refresh" size={15} /></span> Saving…
-        {:else}
-          <Icon name="check" size={15} /> Save
-        {/if}
+
+    <div class="mode-toggle" role="tablist">
+      <button
+        class="mode-btn"
+        class:active={mode === "resume"}
+        role="tab"
+        aria-selected={mode === "resume"}
+        onclick={() => (mode = "resume")}
+      >
+        Resume
       </button>
-      {#if pdfHref}
-        <a class="btn primary" href={pdfHref} download="{r.company ?? 'resume'}-{r.role ?? r.template}.pdf">
+      <button
+        class="mode-btn"
+        class:active={mode === "cover"}
+        role="tab"
+        aria-selected={mode === "cover"}
+        disabled={!hasCoverLetter}
+        title={hasCoverLetter ? "" : "Cover letter not available for this template"}
+        onclick={() => (mode = "cover")}
+      >
+        Cover Letter
+      </button>
+    </div>
+
+    <div class="detail-actions">
+      {#if mode === "resume"}
+        <button class="btn" onclick={saveAndRegenerate} disabled={saving || !isValidYaml}>
+          {#if saving}
+            <span class="spin"><Icon name="refresh" size={15} /></span> Saving…
+          {:else}
+            <Icon name="check" size={15} /> Save
+          {/if}
+        </button>
+        {#if pdfHref}
+          <a class="btn primary" href={pdfHref} download="{r.company ?? 'resume'}-{r.role ?? r.template}.pdf">
+            <Icon name="download" size={15} /> Download
+          </a>
+        {/if}
+      {:else}
+        <button class="btn" onclick={saveCoverLetter} disabled={clSaving || !clValidYaml}>
+          {#if clSaving}
+            <span class="spin"><Icon name="refresh" size={15} /></span> Saving…
+          {:else}
+            <Icon name="check" size={15} /> Save
+          {/if}
+        </button>
+        <button class="btn primary" onclick={downloadCoverLetter} disabled={!clValidYaml}>
           <Icon name="download" size={15} /> Download
-        </a>
+        </button>
       {/if}
     </div>
   </header>
 
   <div class="detail-body">
-    <aside class="diff-pane">
-      <div class="pane-head">
-        <span class="label">Override YAML</span>
-        <div class="pane-head-right">
-          {#if yamlError}
-            <span class="label error" title={yamlError}>
-              {yamlError.length > 36 ? yamlError.slice(0, 36) + "…" : yamlError}
-            </span>
-          {:else if isValidYaml}
-            <span class="label ok">Valid</span>
-          {/if}
-          <button class="btn fmt" onclick={onFormat} disabled={!isValidYaml} title="Format YAML">
-            <Icon name="braces" size={13} /> Format
-          </button>
+    {#if mode === "resume"}
+      <aside class="diff-pane">
+        <div class="pane-head">
+          <span class="label">Override YAML</span>
+          <div class="pane-head-right">
+            {#if yamlError}
+              <span class="label error" title={yamlError}>
+                {yamlError.length > 36 ? yamlError.slice(0, 36) + "…" : yamlError}
+              </span>
+            {:else if isValidYaml}
+              <span class="label ok">Valid</span>
+            {/if}
+            <button class="btn fmt" onclick={onFormat} disabled={!isValidYaml} title="Format YAML">
+              <Icon name="braces" size={13} /> Format
+            </button>
+          </div>
         </div>
-      </div>
-      <textarea
-        class="yaml-editor"
-        bind:value={yamlContent}
-        oninput={onInput}
-        onkeydown={handleYamlKeydown}
-        spellcheck="false"
-      ></textarea>
-    </aside>
+        <textarea
+          class="yaml-editor"
+          bind:value={yamlContent}
+          oninput={onInput}
+          onkeydown={handleYamlKeydown}
+          spellcheck="false"
+        ></textarea>
+      </aside>
 
-    <section class="pdf-pane">
-      <div class="pane-head">
-        <span class="label">Live preview</span>
-        {#if previewLoading}
-          <span class="label loading">
-            <span class="spin-inline"><Icon name="refresh" size={12} /></span> Rendering…
-          </span>
-        {/if}
-      </div>
-      {#if previewUrl}
-        <iframe class="pdf-frame" src={previewUrl} title="Resume preview"></iframe>
-      {:else}
-        <div class="preview-placeholder" class:error={Boolean(yamlError)}>
-          <Icon name={yamlError ? "alert" : "file-text"} size={48} />
-          <span>{yamlError || "Rendering preview…"}</span>
+      <section class="pdf-pane">
+        <div class="pane-head">
+          <span class="label">Live preview</span>
+          {#if previewLoading}
+            <span class="label loading">
+              <span class="spin-inline"><Icon name="refresh" size={12} /></span> Rendering…
+            </span>
+          {/if}
         </div>
-      {/if}
-    </section>
+        {#if previewUrl}
+          <iframe class="pdf-frame" src={previewUrl} title="Resume preview"></iframe>
+        {:else}
+          <div class="preview-placeholder" class:error={Boolean(yamlError)}>
+            <Icon name={yamlError ? "alert" : "file-text"} size={48} />
+            <span>{yamlError || "Rendering preview…"}</span>
+          </div>
+        {/if}
+      </section>
+    {:else}
+      <aside class="diff-pane">
+        <div class="pane-head">
+          <span class="label">Cover letter YAML</span>
+          <div class="pane-head-right">
+            {#if clError}
+              <span class="label error" title={clError}>
+                {clError.length > 36 ? clError.slice(0, 36) + "…" : clError}
+              </span>
+            {:else if clValidYaml}
+              <span class="label ok">Valid</span>
+            {/if}
+            <button class="btn fmt" onclick={onClFormat} disabled={!clValidYaml} title="Format YAML">
+              <Icon name="braces" size={13} /> Format
+            </button>
+          </div>
+        </div>
+        <textarea
+          class="yaml-editor"
+          bind:value={clYaml}
+          oninput={onClInput}
+          onkeydown={handleYamlKeydown}
+          spellcheck="false"
+        ></textarea>
+        <p class="cl-hint">
+          Your name and contact details come from the resume profile — only the recipient and the
+          letter body live here.
+        </p>
+      </aside>
+
+      <section class="pdf-pane">
+        <div class="pane-head">
+          <span class="label">Live preview</span>
+          {#if clPreviewLoading}
+            <span class="label loading">
+              <span class="spin-inline"><Icon name="refresh" size={12} /></span> Rendering…
+            </span>
+          {/if}
+        </div>
+        {#if clPreviewUrl}
+          <iframe class="pdf-frame" src={clPreviewUrl} title="Cover letter preview"></iframe>
+        {:else}
+          <div class="preview-placeholder" class:error={Boolean(clError)}>
+            <Icon name={clError ? "alert" : "file-text"} size={48} />
+            <span>{clError || "Rendering preview…"}</span>
+          </div>
+        {/if}
+      </section>
+    {/if}
   </div>
 </div>
 
@@ -316,6 +550,44 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .mode-toggle {
+    display: inline-flex;
+    margin-left: 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .mode-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--surface);
+    color: var(--text-soft);
+    border: none;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .mode-btn + .mode-btn {
+    border-left: 1px solid var(--border);
+  }
+
+  .mode-btn:hover:not(:disabled):not(.active) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .mode-btn.active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .mode-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .detail-actions {
@@ -411,6 +683,16 @@
 
   .yaml-editor:focus {
     background: var(--surface);
+  }
+
+  .cl-hint {
+    margin: 0;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    flex-shrink: 0;
   }
 
   .pdf-frame {

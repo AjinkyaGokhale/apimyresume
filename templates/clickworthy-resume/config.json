@@ -1,0 +1,9 @@
+{
+  "id": "clickworthy-resume",
+  "name": "Clickworthy Resume",
+  "description": "Clean, accent-coloured single-column resume with a centered small-caps header, ruled section titles and compact grid entries. Adapted from the open-source clickworthy-resume Typst template, and ships a matching cover-letter variant.",
+  "engine": "typst",
+  "paperSize": "us-letter",
+  "fonts": ["New Computer Modern"],
+  "typstPackages": []
+}

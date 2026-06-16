@@ -275,11 +275,11 @@
 
           <div class="card-body">
             <div class="card-name">
-              <span class="base-pill"><Icon name="folder" size={11} /> Base</span>
-              <span class="folder-id">{base.id}</span>
+              <span class="folder-id">{base.name || base.id}</span>
             </div>
             <div class="card-date">
-              {base.template} · {children.length} child{children.length === 1 ? '' : 'ren'}
+              <span>{base.template} · {children.length} child{children.length === 1 ? '' : 'ren'}</span>
+              <span class="base-pill"><Icon name="folder" size={11} /> Base</span>
             </div>
           </div>
 
@@ -344,7 +344,15 @@
     white-space: nowrap;
   }
 
-  /* "Base" tag sits inline next to the id, in the card body. */
+  /* Bottom meta row: template/child count on the left, "Base" pill on the right. */
+  .folder-card .card-date {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* "Base" tag sits at the bottom-right of the card body. */
   .base-pill {
     flex-shrink: 0;
     display: inline-flex;

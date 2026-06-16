@@ -355,7 +355,8 @@
     color: var(--badge-red-text);
   }
   .method.post,
-  .method.patch {
+  .method.patch,
+  .method.put {
     background: var(--surface-2);
     color: var(--text);
     border-color: var(--border);

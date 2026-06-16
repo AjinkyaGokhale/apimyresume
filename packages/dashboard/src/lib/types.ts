@@ -1,3 +1,24 @@
+export interface Addressee {
+  name: string;
+  institution?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zip?: string;
+}
+
+export interface CoverLetter {
+  addressee: Addressee;
+  body: {
+    intro?: string;
+    paragraphs?: string[];
+    closing?: string;
+    signoff?: string;
+  };
+  date?: string;
+}
+
 export interface ResumeDto {
   id: string;
   base_id: string;
@@ -10,6 +31,9 @@ export interface ResumeDto {
   version: number;
   created_at: string;
   updated_at: string;
+  /** Present on the single-resume detail response (GET /resumes/:id). */
+  has_cover_letter?: boolean;
+  cover_letter?: CoverLetter | null;
 }
 
 export interface BaseDto {

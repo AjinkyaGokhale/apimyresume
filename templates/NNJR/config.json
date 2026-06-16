@@ -1,0 +1,9 @@
+{
+  "id": "NNJR",
+  "name": "NNJR (Not Jake's Resume)",
+  "description": "Classic single-column Typst resume in the style of Jake's Resume — centered header, small-caps section rules, compact entries. Adapted from the NNJR template.",
+  "engine": "typst",
+  "paperSize": "us-letter",
+  "fonts": ["New Computer Modern"],
+  "typstPackages": []
+}
