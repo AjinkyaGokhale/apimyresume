@@ -55,20 +55,15 @@ async function previewChild(doc: Record<string, unknown>): Promise<{ pdf: Uint8A
   }
 }
 
-/** Full-document preview (base-create): render arbitrary KB-shaped data directly. */
-async function previewFullDocument(doc: Record<string, unknown>): Promise<{ pdf: Uint8Array; warnings: string[] }> {
-  const templateId = doc.template as string;
-  if (!templateId) {
-    throw badRequest("template is required", "template_required", "template");
-  }
-
-  const template = templateRegistry.get(templateId);
-  if (!template) {
-    throw badRequest(`template '${templateId}' not found`, "template_not_found", "template");
-  }
-
+/**
+ * Build a render-ready MergedDoc from arbitrary KB-shaped data, applying the
+ * same lenient defaults the live editor relies on (no schema validation, so a
+ * half-typed document still previews). Every section a template can render must
+ * be carried through here — anything omitted silently never reaches the mapper.
+ */
+export function buildPreviewDoc(doc: Record<string, unknown>, templateId: string): MergedDoc {
   const profileData = (doc.profile || {}) as Record<string, string>;
-  const merged: MergedDoc = {
+  return {
     id: (doc.id as string) || "preview",
     template: templateId,
     template_lock: false,
@@ -87,7 +82,23 @@ async function previewFullDocument(doc: Record<string, unknown>): Promise<{ pdf:
     projects: (doc.projects as MergedDoc["projects"]) || [],
     certifications: (doc.certifications as MergedDoc["certifications"]) || [],
     extracurriculars: (doc.extracurriculars as MergedDoc["extracurriculars"]) || [],
+    custom: (doc.custom as MergedDoc["custom"]) || [],
   };
+}
+
+/** Full-document preview (base-create): render arbitrary KB-shaped data directly. */
+async function previewFullDocument(doc: Record<string, unknown>): Promise<{ pdf: Uint8Array; warnings: string[] }> {
+  const templateId = doc.template as string;
+  if (!templateId) {
+    throw badRequest("template is required", "template_required", "template");
+  }
+
+  const template = templateRegistry.get(templateId);
+  if (!template) {
+    throw badRequest(`template '${templateId}' not found`, "template_not_found", "template");
+  }
+
+  const merged = buildPreviewDoc(doc, templateId);
 
   try {
     const { pdf, warnings } = await renderToPdf(template, merged);
