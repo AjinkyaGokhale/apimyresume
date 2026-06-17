@@ -91,6 +91,7 @@ and **every create or update produces a new PDF version**.
 | Directive | What it does |
 |---|---|
 | `keywords` | Adds a separate keyword block (handy for getting past resume screeners / ATS). |
+| `section_order` | Reorders the resume's sections for this child, e.g. `["experience", "education", "skills"]`. Sections you omit keep their template order behind the ones you list; the header always stays at the top. |
 | `skills_highlight` | Marks certain skills as important for this role. |
 | `inject_bullets` | Rewrites the bullet points of **one** job entry, without resending the whole experience list. |
 

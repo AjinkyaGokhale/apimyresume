@@ -128,3 +128,29 @@ describe("merge engine (spec §7)", () => {
     expect(base).toEqual(before);
   });
 });
+
+describe("section_order directive", () => {
+  test("surfaces on the merged doc as a top-level array", () => {
+    const merged = mergeResume(
+      base,
+      overridesSchema.parse({ section_order: ["experience", "education"] }),
+    );
+    expect(merged.section_order).toEqual(["experience", "education"]);
+  });
+
+  test("does not corrupt content sections (not deep-merged as content)", () => {
+    const merged = mergeResume(
+      base,
+      overridesSchema.parse({ section_order: ["skills", "experience"] }),
+    );
+    // Experience content is still the base content, untouched by section_order.
+    expect(merged.experience.map((e) => e.id)).toEqual(["nineti", "swapmails"]);
+    // section_order is not present as a structural/content key on experience.
+    expect((merged as Record<string, unknown>)["skills"]).toEqual([]);
+  });
+
+  test("absent when not supplied", () => {
+    const merged = mergeResume(base, overridesSchema.parse({}));
+    expect(merged.section_order).toBeUndefined();
+  });
+});

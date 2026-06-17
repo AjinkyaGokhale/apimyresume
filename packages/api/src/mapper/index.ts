@@ -11,7 +11,11 @@ import type { MapSection, TemplateMap } from "../templates/types.ts";
  */
 
 /** A merged base+overrides document, plus directive-derived extras. */
-export type MergedDoc = KB & { keywords?: string[]; skills_highlight?: string[] };
+export type MergedDoc = KB & {
+  keywords?: string[];
+  skills_highlight?: string[];
+  section_order?: string[];
+};
 
 export interface MappedSection {
   label: string;
