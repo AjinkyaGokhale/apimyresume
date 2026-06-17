@@ -147,9 +147,10 @@
 #v(5pt)
 
 // ===== Sections =====
-#customs-after("top")
 
-#if "education" in ctx {
+// Per-section renderers. Each reproduces exactly what that section rendered
+// before; the dispatch loop below decides order from ctx.__layout.order.
+#let render-education() = {
   resume_heading("Education")
   for ed in ctx.education.data {
     edu_item(
@@ -161,9 +162,8 @@
     )
   }
 }
-#customs-after("education")
 
-#if "experience" in ctx {
+#let render-experience() = {
   resume_heading("Experience")
   for job in ctx.experience.data {
     exp_item(
@@ -175,9 +175,8 @@
     )
   }
 }
-#customs-after("experience")
 
-#if "projects" in ctx {
+#let render-projects() = {
   resume_heading("Projects")
   for p in ctx.projects.data {
     project_item(
@@ -189,9 +188,8 @@
     )
   }
 }
-#customs-after("projects")
 
-#if "extracurriculars" in ctx {
+#let render-extracurriculars() = {
   resume_heading("Extracurricular Activities")
   for ex in ctx.extracurriculars.data {
     extra_item(
@@ -201,9 +199,8 @@
     )
   }
 }
-#customs-after("extracurriculars")
 
-#if "certifications" in ctx {
+#let render-certifications() = {
   resume_heading("Certifications")
   for cert in ctx.certifications.data {
     cert_item(
@@ -214,9 +211,8 @@
     )
   }
 }
-#customs-after("certifications")
 
-#if "skills" in ctx {
+#let render-skills() = {
   resume_heading("Technical Skills")
   for cat in ctx.skills.data {
     skill_item(
@@ -225,7 +221,26 @@
     )
   }
 }
-#customs-after("skills")
 
-// Custom sections with no placement (or `after: end`) render last.
+#let renderers = (
+  education: render-education,
+  experience: render-experience,
+  projects: render-projects,
+  extracurriculars: render-extracurriculars,
+  certifications: render-certifications,
+  skills: render-skills,
+)
+
+// Render order is data-driven: header is pinned (already rendered above), then
+// each section in ctx.__layout.order, each followed by any custom sections
+// anchored after it. A section renders only if present in ctx (show_if).
+#customs-after("top")
+#for sid in ctx.__layout.order {
+  if sid != "header" {
+    if (sid in ctx) and (sid in renderers) {
+      (renderers.at(sid))()
+    }
+    customs-after(sid)
+  }
+}
 #customs-after("end")
