@@ -88,9 +88,45 @@ function isFeatured(item: unknown): boolean {
   return typeof item === "object" && item !== null && (item as { featured?: boolean }).featured === true;
 }
 
+/**
+ * Reconcile a per-resume `section_order` override against the template's
+ * declared layout order. The header is always pinned first; the override's
+ * known ids follow in the user's order; any template sections the override did
+ * not mention keep their template order behind them. Unknown and duplicate ids
+ * are ignored, so a bad override can never drop or duplicate a section.
+ */
+function effectiveOrder(templateOrder: string[], sectionOrder?: string[]): string[] {
+  const known = new Set(templateOrder);
+  const result: string[] = [];
+  const seen = new Set<string>();
+  const push = (id: string) => {
+    if (known.has(id) && !seen.has(id)) {
+      result.push(id);
+      seen.add(id);
+    }
+  };
+
+  // Header is pinned to the top and never repositioned.
+  if (known.has("header")) push("header");
+
+  // The override's ids (excluding header), in the user's order.
+  for (const id of sectionOrder ?? []) {
+    if (id === "header") continue;
+    push(id);
+  }
+
+  // Any remaining template sections, in their original template order.
+  for (const id of templateOrder) push(id);
+
+  return result;
+}
+
 export function mapContext(doc: MergedDoc, map: TemplateMap): TemplateContext {
   const ctx: TemplateContext = {
-    __layout: { type: map.layout.type, order: map.layout.order },
+    __layout: {
+      type: map.layout.type,
+      order: effectiveOrder(map.layout.order, doc.section_order),
+    },
   };
 
   for (const section of map.sections) {
