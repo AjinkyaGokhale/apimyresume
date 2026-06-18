@@ -10,5 +10,19 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler"
-  }
+  },
+  // A child `exclude` replaces the base config's, so the generated excludes are
+  // reproduced here (paths relative to this file) alongside test files. Test
+  // files use the bun test runner (`bun:test`, `.ts` imports) which svelte-check
+  // can't type-check; bun discovers them independently of tsconfig.
+  "exclude": [
+    "node_modules/**",
+    "src/service-worker.js",
+    "src/service-worker/**/*.js",
+    "src/service-worker.ts",
+    "src/service-worker/**/*.ts",
+    "src/service-worker.d.ts",
+    "src/service-worker/**/*.d.ts",
+    "src/**/*.test.ts"
+  ]
 }
