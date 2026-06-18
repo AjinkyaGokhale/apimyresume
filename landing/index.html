@@ -137,6 +137,35 @@
     .terminal .c { color: var(--muted); }
     .terminal .g { color: var(--success); }
 
+    /* --- Resume marquee --- */
+    .marquee {
+      position: relative; width: 100%;
+      margin: 0 auto 40px; overflow: hidden;
+      pointer-events: none; /* purely decorative animation */
+      /* Soft fade at both edges so cards glide in/out instead of popping. */
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+              mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+    }
+    .mq-track {
+      display: flex; width: max-content;
+      animation: mq-scroll 24s linear infinite;
+    }
+    .mq-card {
+      flex: 0 0 auto; margin-right: 22px;
+      width: clamp(150px, 21vw, 228px); aspect-ratio: 1 / 1.414;
+      border-radius: 12px; overflow: hidden; background: #f4f4ef;
+      border: 1px solid rgba(255, 255, 255, .08);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, .5);
+    }
+    .mq-card img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+    @keyframes mq-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .mq-track { animation: none; }
+    }
+
     /* --- Sections --- */
     section { padding: 72px 0; }
     .section-head { text-align: center; max-width: 640px; margin: 0 auto 48px; }
@@ -251,6 +280,17 @@
     <!-- HERO -->
     <section class="hero">
       <div class="wrap">
+        <div class="marquee" aria-hidden="true">
+          <div class="mq-track">
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+            <div class="mq-card"><img src="resumes/temp.webp" alt="" /></div>
+          </div>
+        </div>
+
         <span class="eyebrow">Self-hosted · Open source · REST API</span>
         <h1>A polished resume for every job.</h1>
         <p class="sub">
@@ -485,5 +525,13 @@ $ curl -X POST https://your-domain/api/v1/resumes \
       <p class="copyright">© 2026 APIMyResume · MIT licensed · A fun project by <a href="https://ajinkyagokhale.com/">Ajinkya Gokhale</a></p>
     </div>
   </footer>
+
+  <script>
+    (function () {
+      // Duplicate the cards once so the CSS -50% scroll loops seamlessly.
+      const track = document.querySelector(".mq-track");
+      if (track) track.append(...[...track.children].map((c) => c.cloneNode(true)));
+    })();
+  </script>
 </body>
 </html>
