@@ -89,11 +89,12 @@ function isFeatured(item: unknown): boolean {
 }
 
 /**
- * Reconcile a per-resume `section_order` override against the template's
- * declared layout order. The header is always pinned first; the override's
- * known ids follow in the user's order; any template sections the override did
- * not mention keep their template order behind them. Unknown and duplicate ids
- * are ignored, so a bad override can never drop or duplicate a section.
+ * Reconcile the base resume's `section_order` against the template's declared
+ * layout order. (This order is base-owned; children inherit it and cannot
+ * override it — see pipeline/merge.ts.) The header is always pinned first; the
+ * base's known ids follow in its order; any template sections it did not mention
+ * keep their template order behind them. Unknown and duplicate ids are ignored,
+ * so a bad value can never drop or duplicate a section.
  */
 function effectiveOrder(templateOrder: string[], sectionOrder?: string[]): string[] {
   const known = new Set(templateOrder);

@@ -10,14 +10,15 @@ import { log } from "../lib/log.ts";
  * the diff; the merged result is computed at render time.
  */
 
-const DIRECTIVE_KEYS = new Set(["keywords", "inject_bullets", "skills_highlight", "section_order"]);
+const DIRECTIVE_KEYS = new Set(["keywords", "inject_bullets", "skills_highlight"]);
 
 /**
  * Keys always inherited from the base verbatim — never overridable per child.
  * `profile` (name, title, contact, links) is the person's fixed identity;
- * children tailor sections/bullets, not who they are.
+ * `section_order` is the base-owned render sequence — children tailor
+ * sections/bullets, not who they are or the order their resume reads in.
  */
-const INHERITED_KEYS = new Set(["profile"]);
+const INHERITED_KEYS = new Set(["profile", "section_order"]);
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -94,9 +95,10 @@ export function mergeResume(base: KB, overrides: Overrides): MergedDoc {
   }
 
   // Directives surface as their own top-level fields for the mapper (§5, §7).
+  // section_order is deliberately NOT applied here: the base's order (carried on
+  // the clone) always wins, so children can never reorder their sections.
   if (overrides.keywords?.length) merged.keywords = overrides.keywords;
   if (overrides.skills_highlight?.length) merged.skills_highlight = overrides.skills_highlight;
-  if (overrides.section_order?.length) merged.section_order = overrides.section_order;
 
   return merged;
 }

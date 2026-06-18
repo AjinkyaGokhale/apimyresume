@@ -129,27 +129,24 @@ describe("merge engine (spec §7)", () => {
   });
 });
 
-describe("section_order directive", () => {
-  test("surfaces on the merged doc as a top-level array", () => {
-    const merged = mergeResume(
-      base,
-      overridesSchema.parse({ section_order: ["experience", "education"] }),
-    );
-    expect(merged.section_order).toEqual(["experience", "education"]);
+describe("section_order is base-owned, not child-overridable", () => {
+  const orderedBase: KB = { ...base, section_order: ["skills", "experience", "education"] };
+
+  test("child section_order is stripped by the schema and ignored", () => {
+    const overrides = overridesSchema.parse({ section_order: ["experience", "education"] });
+    // The schema drops the field entirely — children cannot send it.
+    expect((overrides as Record<string, unknown>).section_order).toBeUndefined();
+    const merged = mergeResume(orderedBase, overrides);
+    // The base's order wins, untouched by the child's attempt to reorder.
+    expect(merged.section_order).toEqual(["skills", "experience", "education"]);
   });
 
-  test("does not corrupt content sections (not deep-merged as content)", () => {
-    const merged = mergeResume(
-      base,
-      overridesSchema.parse({ section_order: ["skills", "experience"] }),
-    );
-    // Experience content is still the base content, untouched by section_order.
-    expect(merged.experience.map((e) => e.id)).toEqual(["nineti", "swapmails"]);
-    // section_order is not present as a structural/content key on experience.
-    expect((merged as Record<string, unknown>)["skills"]).toEqual([]);
+  test("base order flows through unchanged when child supplies none", () => {
+    const merged = mergeResume(orderedBase, overridesSchema.parse({}));
+    expect(merged.section_order).toEqual(["skills", "experience", "education"]);
   });
 
-  test("absent when not supplied", () => {
+  test("absent when the base sets none", () => {
     const merged = mergeResume(base, overridesSchema.parse({}));
     expect(merged.section_order).toBeUndefined();
   });

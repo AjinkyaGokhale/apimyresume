@@ -45,11 +45,10 @@ export const overridesSchema = z.object({
 
   // Tailoring directives.
   keywords: z.array(z.string()).optional(),
-  // Reorders the resume's content sections for this child. Values are section
-  // ids (e.g. "experience", "education"); unknown ids are ignored at map time
-  // and the header is always pinned first. Non-structural — cannot inject
-  // content.
-  section_order: z.array(z.string()).optional(),
+  // NOTE: section order is intentionally NOT overridable per child. The render
+  // sequence is owned by the base resume's `section_order` and every child
+  // inherits it unchanged, so a person's resumes stay visually consistent. Any
+  // `section_order` sent on a child override is stripped here and ignored.
   inject_bullets: z.array(injectBulletsSchema).optional(),
   skills_highlight: z.array(z.string()).optional(),
 });
