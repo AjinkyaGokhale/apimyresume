@@ -25,20 +25,24 @@
 
 #set text(
   font: "New Computer Modern",
-  size: 10.5pt,
+  size: 11pt,
   // Disable ligatures so ATS parsers do not get confused.
   ligatures: false,
+  // Wrap whole words to the next line instead of breaking them with hyphens.
+  hyphenate: false,
 )
 
 #set page(
-  paper: "us-letter",
-  margin: (top: 0.45in, bottom: 0.3in, left: 0.4in, right: 0.4in),
+  paper: "a4",
+  margin: (top: 0.3in, bottom: 0.3in, left: 0.4in, right: 0.4in),
 )
 
 #show link: underline
 
 // Small-caps, ruled section titles (the upstream's signature look).
-#show heading.where(level: 1): it => block(width: 100%, breakable: false)[
+// `above` tightens the gap between the previous section and this heading
+// (default block spacing is ~1.2em); `below` tightens the gap to its content.
+#show heading.where(level: 1): it => block(width: 100%, breakable: false, above: 0.5em, below: 0.65em)[
   #set text(size: 12.5pt, weight: "regular")
   #smallcaps(it.body)
   #v(-0.85em)
@@ -69,8 +73,13 @@
 
 #let project-entry(name, url, role, period) = {
   let nm = if url != "" { link("https://" + url)[#strong(name)] } else { strong(name) }
-  let heading = if role != "" { [#nm #h(0.5em) #emph(role)] } else { nm }
-  grid(columns: (1fr, auto), align(left)[#heading], align(right)[#period])
+  // Name (left) and period (right) on the first line; the role drops to its own
+  // line below so a long project/thesis title doesn't collide with it.
+  grid(columns: (1fr, auto), align(left)[#nm], align(right)[#period])
+  if role != "" {
+    v(-0.5em)
+    emph(role)
+  }
   v(-0.3em)
 }
 
@@ -78,7 +87,7 @@
 #align(center)[
   #upper(text(size: 23pt, weight: "extrabold")[#name])
 ]
-#v(-0.4em)
+#v(-1.3em)
 
 #let contact-item(value, link-type: "") = {
   if value != "" {
@@ -192,6 +201,8 @@
     ]
     #v(3pt)
   ]
+  // A little extra breathing room after the education section.
+  #v(3pt)
 ]
 
 #let render-experience() = [
