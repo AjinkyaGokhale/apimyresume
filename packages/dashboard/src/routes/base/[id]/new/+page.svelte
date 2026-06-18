@@ -29,7 +29,15 @@
       role: "",
       tags: [],
     };
-    for (const key of SECTION_KEYS) {
+    // Lay the section blocks out in the base's order so the child inherits it;
+    // rearranging them here defines the child's own order (see buildPayload).
+    const baseOrder = (Array.isArray(base.data?.section_order) ? base.data.section_order : [])
+      .filter((k: string) => (SECTION_KEYS as readonly string[]).includes(k));
+    const orderedSections = [
+      ...baseOrder,
+      ...SECTION_KEYS.filter((k) => !baseOrder.includes(k)),
+    ];
+    for (const key of orderedSections) {
       const val = base.data?.[key];
       if (Array.isArray(val) && val.length > 0) obj[key] = val;
     }
@@ -55,6 +63,16 @@
     const NON_OVERRIDE_KEYS = new Set(["company", "role", "tags", "template", "profile"]);
     for (const [k, v] of Object.entries(parsed)) {
       if (!NON_OVERRIDE_KEYS.has(k) && v != null) overrides[k] = v;
+    }
+
+    // The order the section blocks appear in the YAML is the child's section
+    // order — captured as an explicit array (order-stable through schema
+    // validation, unlike object key order). A hand-typed one wins.
+    if (overrides.section_order == null) {
+      const blockOrder = Object.keys(parsed).filter((k) =>
+        (SECTION_KEYS as readonly string[]).includes(k),
+      );
+      if (blockOrder.length) overrides.section_order = blockOrder;
     }
 
     const payload: Record<string, unknown> = { base_id: base.id };

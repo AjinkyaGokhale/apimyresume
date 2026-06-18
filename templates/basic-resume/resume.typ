@@ -223,17 +223,46 @@
 // optional `after` key naming the built-in section it should follow; "top"
 // renders before everything and a missing/`end` key renders at the bottom.
 #let all-customs = if "custom" in ctx { ctx.custom.data } else { () }
+// One detail block: bold title + inline subtitle, right-aligned period,
+// clickable link, bullets.
+#let render-custom-detail(title, sub, period, url, bls) = [
+  #if title != "" or sub != "" or period != "" [
+    #if title != "" [*#title*#if sub != "" [ — #emph(sub)]] else if sub != "" [#emph(sub)]#if period != "" [#h(1fr) #period]#linebreak()
+  ]
+  #if url != "" [
+    #link(if url.starts-with("http") { url } else { "https://" + url })[#url] #linebreak()
+  ]
+  #for b in bls [
+    - #b
+  ]
+]
 #let render-custom(c) = [
   = #c.at("title", default: "")
-  #for b in c.at("bullets", default: ()) [
-    - #b
+  #let entries = c.at("entries", default: ())
+  #if entries.len() > 0 [
+    #for e in entries [
+      #render-custom-detail(e.at("title", default: ""), e.at("subtitle", default: ""), e.at("period", default: ""), e.at("link", default: ""), e.at("bullets", default: ()))
+      #v(1pt)
+    ]
+  ] else [
+    #render-custom-detail("", c.at("subtitle", default: ""), "", c.at("link", default: ""), c.at("bullets", default: ()))
   ]
   #v(3pt)
 ]
+// Custom sections with an explicit `after` anchor render right after that
+// section ("top", a section id, or "end").
 #let customs-after(key) = {
   for c in all-customs {
-    let pos = c.at("after", default: "end")
-    if pos == key {
+    if ("after" in c) and (c.after == key) {
+      render-custom(c)
+    }
+  }
+}
+// Custom sections with no `after` key render at the "custom" slot, i.e. wherever
+// the custom block sits in the (block-order-derived) layout order.
+#let customs-unanchored() = {
+  for c in all-customs {
+    if "after" not in c {
       render-custom(c)
     }
   }
@@ -342,12 +371,15 @@
 )
 
 // Render order is data-driven: header is pinned (already rendered above), then
-// each section in ctx.__layout.order, each followed by any custom sections
+// each section in ctx.__layout.order. The "custom" slot renders unanchored
+// custom sections; every section is followed by any custom sections explicitly
 // anchored after it. A section renders only if present in ctx (show_if).
 #customs-after("top")
 #for sid in ctx.__layout.order {
   if sid != "header" {
-    if (sid in ctx) and (sid in renderers) {
+    if sid == "custom" {
+      customs-unanchored()
+    } else if (sid in ctx) and (sid in renderers) {
       (renderers.at(sid))()
     }
     customs-after(sid)

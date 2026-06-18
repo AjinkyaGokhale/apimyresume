@@ -42,18 +42,32 @@
     if (resume.role) obj.role = resume.role;
     if (resume.tags?.length) obj.tags = resume.tags;
 
+    const overrides = (resume.overrides ?? {}) as Record<string, unknown>;
+
+    // Section blocks are emitted in the resume's saved `section_order`, so an
+    // arrangement the user made before comes back the same way. Rearranging
+    // these blocks in the editor is what *defines* the order — `buildPatchPayload`
+    // turns the block order back into `section_order` on save, and the render
+    // pipeline renders sections in that order. Sections not named in the saved
+    // order fall back to the default display order behind the named ones.
+    const savedOrder = (Array.isArray(overrides.section_order) ? overrides.section_order : [])
+      .filter((k): k is string => (EDITABLE_SECTIONS as readonly string[]).includes(k));
+    const orderedSections = [
+      ...savedOrder,
+      ...EDITABLE_SECTIONS.filter((k) => !savedOrder.includes(k)),
+    ];
+
     // Always show the full *resolved* content (base + any existing overrides),
     // so experience bullets, projects and skills are right there to edit — not
     // hidden behind a sparse diff. Saving stores the edited sections as the
     // child's overrides.
-    for (const key of EDITABLE_SECTIONS) {
+    for (const key of orderedSections) {
       if (isNonEmpty(merged[key])) obj[key] = merged[key];
     }
 
     // Keep pure directives visible so they survive a round-trip. (inject_bullets
     // is intentionally omitted — its effect is already baked into the resolved
     // experience bullets above, so re-storing it would double-apply.)
-    const overrides = (resume.overrides ?? {}) as Record<string, unknown>;
     for (const key of DIRECTIVES) {
       if (isNonEmpty(overrides[key])) obj[key] = overrides[key];
     }
@@ -70,6 +84,18 @@
     const META_KEYS = new Set(["company", "role", "tags", "template"]);
     for (const [k, v] of Object.entries(parsed)) {
       if (!META_KEYS.has(k) && v != null) overrides[k] = v;
+    }
+
+    // The order the section blocks appear in the YAML *is* the section order.
+    // Capture it as an explicit `section_order` array (order-stable through the
+    // API's schema validation, unlike object key order) so rearranging the
+    // blocks reorders the rendered resume. A `section_order` the user typed by
+    // hand wins over the inferred block order.
+    if (overrides.section_order == null) {
+      const blockOrder = Object.keys(parsed).filter((k) =>
+        (EDITABLE_SECTIONS as readonly string[]).includes(k),
+      );
+      if (blockOrder.length) overrides.section_order = blockOrder;
     }
 
     const payload: Record<string, unknown> = {};
