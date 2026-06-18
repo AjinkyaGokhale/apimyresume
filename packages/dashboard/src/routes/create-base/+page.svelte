@@ -5,7 +5,7 @@
   import YAML from "yaml";
   import Icon from "$lib/Icon.svelte";
   import { handleYamlKeydown } from "$lib/yamlEditor";
-  import { getApiKey, getApiUrl, listTemplates, type TemplateDto } from "$lib/api";
+  import { getApiKey, getApiUrl, getTemplates, type TemplateDto } from "$lib/api";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -33,25 +33,74 @@
 
   /** Load the available templates for the gallery/picker, tracking errors so a
    *  failed/expired session shows a retry instead of an endless spinner. */
-  async function loadTemplates() {
+  // Increments on every load call so a stale auto-retry loop (e.g. after the
+  // component unmounts or a newer load starts) bails instead of clobbering state.
+  let loadToken = 0;
+
+  /** Load the gallery templates. The first request right after navigating here
+   *  can transiently fail before it even reaches the server, yet a slightly
+   *  later attempt (what the manual "Load templates" button does) succeeds — so
+   *  we auto-retry on that same path with widening gaps, staying on the spinner,
+   *  and only show the error if every attempt fails. */
+  async function loadTemplates(force = false) {
+    const token = ++loadToken;
     templatesLoading = true;
     templatesError = null;
-    try {
-      templates = await listTemplates();
-    } catch (e) {
-      console.error("Failed to load templates:", e);
-      templatesError = e instanceof Error ? e.message : "Failed to load templates";
-    } finally {
-      templatesLoading = false;
+
+    // 0ms first try (instant from cache when warm), then space out retries to
+    // ride out the connection blip — mirroring a user clicking the button again.
+    const delaysMs = [0, 800, 1500, 2500];
+    for (let i = 0; i < delaysMs.length; i++) {
+      if (delaysMs[i] > 0) await new Promise((r) => setTimeout(r, delaysMs[i]));
+      if (token !== loadToken) return; // superseded by a newer load / unmounted
+
+      try {
+        templates = await getTemplates(force || i > 0);
+        if (token !== loadToken) return;
+        templatesError = null;
+        templatesLoading = false;
+        return;
+      } catch (e) {
+        console.error(`Failed to load templates (attempt ${i + 1}):`, e);
+        templatesError = e instanceof Error ? e.message : "Failed to load templates";
+      }
     }
+    if (token === loadToken) templatesLoading = false;
   }
 
+  /** Content section ids whose YAML block order defines the render order. */
+  const SECTION_KEYS = [
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "certifications",
+    "extracurriculars",
+    "languages",
+    "awards",
+    "custom",
+  ];
+
   function baseToYaml(base: NonNullable<typeof editingBase>): string {
-    const doc: Record<string, unknown> = {
-      name: base.name,
-      template: base.template,
-      ...(base.data ?? {}),
-    };
+    const data = { ...((base.data ?? {}) as Record<string, unknown>) };
+
+    // The section order is expressed by the order of the blocks themselves, so
+    // we lay them out in the saved `section_order` and drop the explicit field
+    // rather than showing a separate `section_order:` line to hand-edit.
+    const savedOrder = (Array.isArray(data.section_order) ? (data.section_order as string[]) : [])
+      .filter((k) => SECTION_KEYS.includes(k));
+    delete data.section_order;
+    const orderedSections = [...savedOrder, ...SECTION_KEYS.filter((k) => !savedOrder.includes(k))];
+
+    const doc: Record<string, unknown> = { name: base.name, template: base.template };
+    // Non-section keys first (id, profile, …) in their existing order, then the
+    // section blocks in the resolved order.
+    for (const [k, v] of Object.entries(data)) {
+      if (!SECTION_KEYS.includes(k)) doc[k] = v;
+    }
+    for (const key of orderedSections) {
+      if (data[key] != null) doc[key] = data[key];
+    }
     return YAML.stringify(doc, { lineWidth: 0 });
   }
 
@@ -142,10 +191,12 @@ skills:
   - category: Cloud & DevOps
     items: [Docker, Kubernetes, AWS, Terraform, GitHub Actions, CI/CD]
 
-# Custom sections: any title with bullets under it.
-# Optional "after" slots a section under a built-in one
-# (top | education | experience | projects | extracurriculars |
-#  certifications | skills | end). Omit it to render at the bottom.
+# Custom sections: a title with bullets under it. Add an optional
+# "subtitle" and clickable "link". Optional "after" slots a section
+# under a built-in one (top | education | experience | projects |
+#  extracurriculars | certifications | skills | end). Omit it to render
+# at the bottom. For several items under one heading (e.g. multiple
+# projects), use "entries" — each gets its own title/subtitle/link/bullets.
 custom:
   - id: publications
     title: Publications
@@ -153,6 +204,20 @@ custom:
     bullets:
       - "Muster, M. (2024). Efficient Attention Mechanisms. German AI Conf."
       - "Co-author of Scalable KV Stores, Journal of Distributed Systems."
+  - id: oss
+    title: Open Source Contributions
+    entries:
+      - title: OpenMetrics
+        subtitle: Core Maintainer
+        period: Oct 2021 – Present
+        link: https://github.com/alex/openmetrics
+        bullets:
+          - "Reviewed 200+ PRs, mentored 5 contributors"
+          - "Shipped v2.0 used by 1.2k+ projects"
+      - title: Fastify
+        subtitle: Contributor
+        bullets:
+          - "Added HTTP/2 support"
   - id: volunteering
     title: Volunteering
     bullets:
@@ -322,6 +387,7 @@ custom:
     void loadTemplates();
 
     return () => {
+      loadToken++; // stop any in-flight auto-retry loop
       if (previewPdfUrl) {
         URL.revokeObjectURL(previewPdfUrl);
       }
@@ -334,6 +400,16 @@ custom:
 
     const profile = parsed.profile as Record<string, unknown>;
     if (!profile.title) profile.title = 'Software Engineer';
+
+    // The order the section blocks appear in the YAML *is* the render order.
+    // Persist it as an explicit `section_order` array (order-stable through the
+    // API's schema validation, unlike object key order), so the base — and the
+    // child resumes derived from it — render sections in this order. A
+    // hand-typed `section_order` wins.
+    if (parsed.section_order == null) {
+      const blockOrder = Object.keys(parsed).filter((k) => SECTION_KEYS.includes(k));
+      if (blockOrder.length) parsed.section_order = blockOrder;
+    }
 
     isCreating = true;
     try {
@@ -489,7 +565,7 @@ custom:
             <span>Couldn't load templates.</span>
             {#if templatesError}<span class="gallery-err">{templatesError}</span>{/if}
             <span class="gallery-err-hint">API: {getApiUrl()} — if your session expired, reload the page or log in again.</span>
-            <button class="btn" onclick={() => loadTemplates()}>
+            <button class="btn" onclick={() => loadTemplates(true)}>
               <Icon name="refresh" size={15} /> Load templates
             </button>
           </div>

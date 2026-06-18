@@ -1,7 +1,7 @@
 // dashboard/src/routes/+layout.ts
 import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
-import { listResumes } from "$lib/api";
+import { listResumes, primeTemplates } from "$lib/api";
 import { authState, authMe } from "$lib/auth";
 import type { LayoutLoad } from "./$types";
 
@@ -46,6 +46,9 @@ export const load: LayoutLoad = async ({ url }) => {
     // Verify with /me so the layout data carries the username.
     try {
       const me = await authMe();
+      // Warm the template cache for the whole session so the create-base gallery
+      // never has to fetch on click (the request that intermittently fails).
+      primeTemplates();
       // Sidebar resume count — best effort, the shell renders fine without it.
       let total = 0;
       try {

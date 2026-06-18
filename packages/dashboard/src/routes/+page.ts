@@ -1,5 +1,5 @@
 // dashboard/src/routes/+page.ts
-import { listResumes, listBases, listTemplates, ApiUnreachable } from "$lib/api";
+import { listResumes, listBases, getTemplates, ApiUnreachable } from "$lib/api";
 import type { ResumeDto, Stat } from "$lib/types";
 import type { PageLoad } from "./$types";
 
@@ -48,7 +48,7 @@ export const load: PageLoad = async ({ url }) => {
     const [resumesRes, basesRes, templatesRes] = await Promise.all([
       listResumes({ company, tag, limit: 500 }),
       listBases(),
-      listTemplates(),
+      getTemplates(),
     ]);
     const resumes = (resumesRes as { data?: ResumeDto[] }).data || [];
     const bases = Array.isArray(basesRes) ? basesRes : [];
