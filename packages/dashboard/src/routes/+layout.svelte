@@ -4,6 +4,7 @@
   import { page } from "$app/stores";
   import { version } from "$app/environment";
   import { authLogout } from "$lib/auth";
+  import { clearTemplatesCache } from "$lib/api";
   import Icon from "$lib/Icon.svelte";
   import NavLoader from "$lib/NavLoader.svelte";
   import type { Snippet } from "svelte";
@@ -20,6 +21,7 @@
     } catch {
       // best effort
     }
+    clearTemplatesCache();
     await invalidateAll();
     await goto("/login", { replaceState: true });
   }

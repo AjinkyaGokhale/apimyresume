@@ -113,16 +113,52 @@
 
 // ----- Custom (free-form) sections: any title + bullets, placed via `after` -----
 #let all-customs = if "custom" in ctx { ctx.custom.data } else { () }
-#let render-custom(c) = {
-  resume_heading(c.at("title", default: ""))
-  let bl = c.at("bullets", default: ())
-  if bl.len() > 0 {
-    pad(left: 1em, right: 0.5em, list(..bl))
+// One detail block: bold title + inline subtitle, right-aligned period,
+// clickable link, bullets.
+#let render-custom-detail(title, sub, period, url, bls) = {
+  if title != "" or sub != "" or period != "" {
+    let head = if title != "" [*#title*#if sub != "" [ — #emph(sub)]] else if sub != "" [#emph(sub)]
+    if period != "" {
+      [#head #h(1fr) #period\ ]
+    } else {
+      [#head\ ]
+    }
+  }
+  if url != "" {
+    [#link(if url.starts-with("http") { url } else { "https://" + url })[#url]\ ]
+  }
+  if bls.len() > 0 {
+    pad(left: 1em, right: 0.5em, list(..bls))
   }
 }
+#let render-custom(c) = {
+  resume_heading(c.at("title", default: ""))
+  let entries = c.at("entries", default: ())
+  if entries.len() > 0 {
+    // Multi-entry section: each entry gets its own title/subtitle/period/link/bullets.
+    for e in entries {
+      render-custom-detail(e.at("title", default: ""), e.at("subtitle", default: ""), e.at("period", default: ""), e.at("link", default: ""), e.at("bullets", default: ()))
+      v(1pt)
+    }
+  } else {
+    // Legacy single-entry section: detail lives at the section level.
+    render-custom-detail("", c.at("subtitle", default: ""), "", c.at("link", default: ""), c.at("bullets", default: ()))
+  }
+}
+// Custom sections with an explicit `after` anchor render right after that
+// section ("top", a section id, or "end").
 #let customs-after(key) = {
   for c in all-customs {
-    if c.at("after", default: "end") == key {
+    if ("after" in c) and (c.after == key) {
+      render-custom(c)
+    }
+  }
+}
+// Custom sections with no `after` key render at the "custom" slot, i.e. wherever
+// the custom block sits in the (block-order-derived) layout order.
+#let customs-unanchored() = {
+  for c in all-customs {
+    if "after" not in c {
       render-custom(c)
     }
   }
@@ -147,9 +183,10 @@
 #v(5pt)
 
 // ===== Sections =====
-#customs-after("top")
 
-#if "education" in ctx {
+// Per-section renderers. Each reproduces exactly what that section rendered
+// before; the dispatch loop below decides order from ctx.__layout.order.
+#let render-education() = {
   resume_heading("Education")
   for ed in ctx.education.data {
     edu_item(
@@ -161,9 +198,8 @@
     )
   }
 }
-#customs-after("education")
 
-#if "experience" in ctx {
+#let render-experience() = {
   resume_heading("Experience")
   for job in ctx.experience.data {
     exp_item(
@@ -175,9 +211,8 @@
     )
   }
 }
-#customs-after("experience")
 
-#if "projects" in ctx {
+#let render-projects() = {
   resume_heading("Projects")
   for p in ctx.projects.data {
     project_item(
@@ -189,9 +224,8 @@
     )
   }
 }
-#customs-after("projects")
 
-#if "extracurriculars" in ctx {
+#let render-extracurriculars() = {
   resume_heading("Extracurricular Activities")
   for ex in ctx.extracurriculars.data {
     extra_item(
@@ -201,9 +235,8 @@
     )
   }
 }
-#customs-after("extracurriculars")
 
-#if "certifications" in ctx {
+#let render-certifications() = {
   resume_heading("Certifications")
   for cert in ctx.certifications.data {
     cert_item(
@@ -214,9 +247,8 @@
     )
   }
 }
-#customs-after("certifications")
 
-#if "skills" in ctx {
+#let render-skills() = {
   resume_heading("Technical Skills")
   for cat in ctx.skills.data {
     skill_item(
@@ -225,7 +257,29 @@
     )
   }
 }
-#customs-after("skills")
 
-// Custom sections with no placement (or `after: end`) render last.
+#let renderers = (
+  education: render-education,
+  experience: render-experience,
+  projects: render-projects,
+  extracurriculars: render-extracurriculars,
+  certifications: render-certifications,
+  skills: render-skills,
+)
+
+// Render order is data-driven: header is pinned (already rendered above), then
+// each section in ctx.__layout.order. The "custom" slot renders unanchored
+// custom sections; every section is followed by any custom sections explicitly
+// anchored after it. A section renders only if present in ctx (show_if).
+#customs-after("top")
+#for sid in ctx.__layout.order {
+  if sid != "header" {
+    if sid == "custom" {
+      customs-unanchored()
+    } else if (sid in ctx) and (sid in renderers) {
+      (renderers.at(sid))()
+    }
+    customs-after(sid)
+  }
+}
 #customs-after("end")

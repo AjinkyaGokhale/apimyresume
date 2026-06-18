@@ -61,8 +61,30 @@ async function previewChild(doc: Record<string, unknown>): Promise<{ pdf: Uint8A
  * half-typed document still previews). Every section a template can render must
  * be carried through here — anything omitted silently never reaches the mapper.
  */
+/** Content section ids whose YAML block order defines the render order. */
+const SECTION_KEYS = [
+  "experience",
+  "education",
+  "skills",
+  "projects",
+  "certifications",
+  "extracurriculars",
+  "languages",
+  "awards",
+  "custom",
+] as const;
+
 export function buildPreviewDoc(doc: Record<string, unknown>, templateId: string): MergedDoc {
   const profileData = (doc.profile || {}) as Record<string, string>;
+
+  // The order the section blocks appear in the (unvalidated) YAML defines the
+  // render order — key order is preserved here since this path skips Zod. An
+  // explicit `section_order` the author typed wins over the inferred order. The
+  // mapper reconciles this against the template order (header stays pinned).
+  const sectionOrder = Array.isArray(doc.section_order)
+    ? (doc.section_order as string[])
+    : Object.keys(doc).filter((k) => (SECTION_KEYS as readonly string[]).includes(k));
+
   return {
     id: (doc.id as string) || "preview",
     template: templateId,
@@ -82,7 +104,10 @@ export function buildPreviewDoc(doc: Record<string, unknown>, templateId: string
     projects: (doc.projects as MergedDoc["projects"]) || [],
     certifications: (doc.certifications as MergedDoc["certifications"]) || [],
     extracurriculars: (doc.extracurriculars as MergedDoc["extracurriculars"]) || [],
+    awards: (doc.awards as MergedDoc["awards"]) || [],
+    languages: (doc.languages as MergedDoc["languages"]) || [],
     custom: (doc.custom as MergedDoc["custom"]) || [],
+    ...(sectionOrder.length ? { section_order: sectionOrder } : {}),
   };
 }
 

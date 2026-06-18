@@ -37,4 +37,50 @@ describe("buildPreviewDoc", () => {
     const ctx = mapContext(merged, template!.map) as Record<string, { data: unknown[] }>;
     expect(ctx.custom?.data).toHaveLength(2);
   });
+
+  test("derives section_order from the YAML block order, driving the layout", () => {
+    // skills block placed before experience → skills must render first.
+    const ordered = {
+      template: "basic-resume",
+      profile: { name: "M", title: "Eng", email: "m@x.dev" },
+      skills: [{ category: "Lang", items: ["Go"] }],
+      experience: [{ id: "e1", role: "Engineer", company: "ACME", period: "2023", bullets: ["x"] }],
+    };
+    const merged = buildPreviewDoc(ordered, "basic-resume");
+    expect(merged.section_order).toEqual(["skills", "experience"]);
+
+    const template = templateRegistry.get("basic-resume")!;
+    const order = mapContext(merged, template.map).__layout.order;
+    expect(order[0]).toBe("header"); // header stays pinned
+    expect(order.indexOf("skills")).toBeLessThan(order.indexOf("experience"));
+  });
+
+  test("carries a custom section's nested entries into the template context", () => {
+    const withEntries = {
+      template: "basic-resume",
+      profile: { name: "M", title: "Eng", email: "m@x.dev" },
+      custom: [
+        {
+          id: "oss",
+          title: "Open Source Contributions",
+          entries: [
+            { title: "OpenMetrics", subtitle: "Core Maintainer", bullets: ["Reviewed 200+ PRs"] },
+            { title: "Fastify", subtitle: "Contributor", bullets: ["Added HTTP/2 support"] },
+          ],
+        },
+      ],
+    };
+    const merged = buildPreviewDoc(withEntries, "basic-resume");
+    const template = templateRegistry.get("basic-resume")!;
+    const ctx = mapContext(merged, template.map) as Record<string, { data: Array<{ entries?: unknown[] }> }>;
+    expect(ctx.custom?.data?.[0]?.entries).toHaveLength(2);
+  });
+
+  test("an explicit section_order wins over block order", () => {
+    const merged = buildPreviewDoc(
+      { ...doc, section_order: ["custom", "experience"] },
+      "basic-resume",
+    );
+    expect(merged.section_order).toEqual(["custom", "experience"]);
+  });
 });

@@ -86,3 +86,56 @@ describe("field mapper", () => {
     expect(round).toEqual(ctx);
   });
 });
+
+describe("section_order reconciliation", () => {
+  const sections: TemplateMap["sections"] = [
+    { id: "header", source: "profile", label: "", featured_first: false, required: true },
+    { id: "education", source: "education", label: "Education", featured_first: false, required: false },
+    { id: "experience", source: "experience", label: "Experience", featured_first: false, required: false },
+    { id: "skills", source: "skills", label: "Skills", featured_first: false, required: false },
+  ];
+  const templateOrder = ["header", "education", "experience", "skills"];
+  const m = (order: string[]) => map(sections, { order });
+
+  test("no section_order yields the template order unchanged", () => {
+    const ctx = mapContext(doc(), m(templateOrder));
+    expect(ctx.__layout.order).toEqual(templateOrder);
+  });
+
+  test("full reorder is honored, header pinned first", () => {
+    const ctx = mapContext(
+      doc({ section_order: ["skills", "experience", "education"] }),
+      m(templateOrder),
+    );
+    expect(ctx.__layout.order).toEqual(["header", "skills", "experience", "education"]);
+  });
+
+  test("partial reorder moves listed sections to front, rest keep template order", () => {
+    const ctx = mapContext(doc({ section_order: ["skills"] }), m(templateOrder));
+    expect(ctx.__layout.order).toEqual(["header", "skills", "education", "experience"]);
+  });
+
+  test("unknown ids are ignored", () => {
+    const ctx = mapContext(
+      doc({ section_order: ["skills", "bogus", "experience"] }),
+      m(templateOrder),
+    );
+    expect(ctx.__layout.order).toEqual(["header", "skills", "experience", "education"]);
+  });
+
+  test("header in section_order is ignored for positioning (stays first)", () => {
+    const ctx = mapContext(
+      doc({ section_order: ["skills", "header", "experience"] }),
+      m(templateOrder),
+    );
+    expect(ctx.__layout.order).toEqual(["header", "skills", "experience", "education"]);
+  });
+
+  test("duplicate ids are de-duplicated", () => {
+    const ctx = mapContext(
+      doc({ section_order: ["skills", "skills", "experience"] }),
+      m(templateOrder),
+    );
+    expect(ctx.__layout.order).toEqual(["header", "skills", "experience", "education"]);
+  });
+});

@@ -23,25 +23,55 @@ export class ApiError extends Error {
 
 export class ApiUnreachable extends Error {}
 
+// The very first request to the API after a navigation occasionally fails on a
+// transient connection blip (the browser drops/re-establishes the socket), then
+// an identical retry succeeds immediately. Auto-retry idempotent reads so a
+// one-off hiccup never surfaces as a hard "couldn't load" error to the user.
+const GET_RETRIES = 2;
+const RETRY_DELAY_MS = 150;
+// Gateway/availability errors are worth retrying; 4xx (auth, validation,
+// rate-limit) are deterministic and must surface immediately, not be hammered.
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${getApiUrl()}/api/v1${path}`, {
-      ...init,
-      // Ride the httpOnly session cookie alongside the optional API key —
-      // required for the dev server, which runs on a different origin.
-      credentials: "include",
-      headers: { "X-API-Key": getApiKey(), ...(init.headers ?? {}) },
-    });
-  } catch (err) {
-    throw new ApiUnreachable(String(err));
+  const method = (init.method ?? "GET").toUpperCase();
+  // Only replay safe, idempotent reads — never a mutation (POST/PUT/PATCH/DELETE).
+  const maxAttempts = method === "GET" ? GET_RETRIES + 1 : 1;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const isLast = attempt === maxAttempts - 1;
+    let res: Response;
+    try {
+      res = await fetch(`${getApiUrl()}/api/v1${path}`, {
+        ...init,
+        // Ride the httpOnly session cookie alongside the optional API key —
+        // required for the dev server, which runs on a different origin.
+        credentials: "include",
+        headers: { "X-API-Key": getApiKey(), ...(init.headers ?? {}) },
+      });
+    } catch (err) {
+      // Network/connection failure — the classic transient first-request blip.
+      lastError = new ApiUnreachable(String(err));
+      if (isLast) throw lastError;
+      await sleep(RETRY_DELAY_MS * (attempt + 1));
+      continue;
+    }
+    if (!res.ok) {
+      if (RETRYABLE_STATUS.has(res.status) && !isLast) {
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError((body as { error?: string }).error ?? res.statusText, res.status);
+    }
+    if (res.status === 204) return undefined as T;
+    return (await res.json()) as T;
   }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new ApiError((body as { error?: string }).error ?? res.statusText, res.status);
-  }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Unreachable: the loop either returns or throws on the last attempt.
+  throw lastError;
 }
 
 export function listResumes(params: {
@@ -135,6 +165,50 @@ export const getSchema = () => api<SchemaDoc>("/schema");
 export const getBase = (id: string) => api<BaseDto>(`/bases/${id}`);
 export const listBases = () => api<BaseDto[]>("/bases");
 export const listTemplates = () => api<TemplateDto[]>("/templates");
+
+// --- Session-level template cache ---------------------------------------------
+// The template set is fixed for the lifetime of a session, yet the create-base
+// gallery used to fetch it fresh on every visit. That first-after-navigation
+// fetch is exactly the request that intermittently dies in the browser before
+// reaching the server (see the connection-blip diagnosis), surfacing as
+// "Couldn't load templates". Instead we fetch once, cache the result, and serve
+// every later read from memory — so the gallery is instant and never depends on
+// a fresh request at click time. `primeTemplates()` warms it during the initial
+// authed dashboard load, well before the user clicks "New Base Resume".
+let templatesCache: TemplateDto[] | null = null;
+let templatesInflight: Promise<TemplateDto[]> | null = null;
+
+/** Templates from the session cache, fetching once on first use. Concurrent
+ *  callers share a single in-flight request. Pass `force` to refresh. */
+export function getTemplates(force = false): Promise<TemplateDto[]> {
+  if (!force && templatesCache) return Promise.resolve(templatesCache);
+  if (!templatesInflight) {
+    templatesInflight = listTemplates()
+      .then((t) => {
+        templatesCache = t;
+        return t;
+      })
+      .finally(() => {
+        templatesInflight = null;
+      });
+  }
+  return templatesInflight;
+}
+
+/** Fire-and-forget warm of the template cache. Safe to call repeatedly — it
+ *  no-ops once cached or while a fetch is in flight, and swallows failures
+ *  (the on-demand `getTemplates()` call will surface any real error later). */
+export function primeTemplates(): void {
+  if (templatesCache || templatesInflight) return;
+  void getTemplates().catch(() => {});
+}
+
+/** Drop the cached templates. Called on sign-out so a different session never
+ *  inherits the previous owner's cache. */
+export function clearTemplatesCache(): void {
+  templatesCache = null;
+  templatesInflight = null;
+}
 export const createBase = (payload: unknown) =>
   api<BaseDto>("/bases", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
 export const deleteBase = (id: string, cascade = false) =>

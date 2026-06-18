@@ -1,0 +1,18 @@
+{
+  "template": "simple-technical-resume-template",
+  "sections": [
+    { "id": "header", "source": "profile", "label": "", "required": true },
+    { "id": "education", "source": "education", "label": "Education", "show_if": "education.length > 0" },
+    { "id": "experience", "source": "experience", "label": "Experience", "show_if": "experience.length > 0" },
+    { "id": "projects", "source": "projects", "label": "Projects", "show_if": "projects.length > 0" },
+    { "id": "skills", "source": "skills", "label": "Technical Skills", "show_if": "skills.length > 0" },
+    { "id": "certifications", "source": "certifications", "label": "Certifications", "show_if": "certifications.length > 0" },
+    { "id": "awards", "source": "awards", "label": "Awards", "show_if": "awards.length > 0" },
+    { "id": "extracurriculars", "source": "extracurriculars", "label": "Extracurricular Activities", "show_if": "extracurriculars.length > 0" },
+    { "id": "custom", "source": "custom", "label": "", "show_if": "custom.length > 0" }
+  ],
+  "layout": {
+    "type": "single_column",
+    "order": ["header", "education", "experience", "projects", "skills", "certifications", "awards", "extracurriculars", "custom"]
+  }
+}

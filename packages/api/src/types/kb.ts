@@ -96,8 +96,27 @@ export const awardSchema = z.object({
 export const customSectionSchema = z.object({
   id: z.string(),
   title: z.string(),
+  // Optional entry detail lines shown under the heading, above the bullets:
+  // `subtitle` (e.g. a role) and `link` (a complete URL, rendered clickable).
+  subtitle: z.string().optional(),
+  link: z.string().optional(),
   bullets: z.array(z.string()).default([]),
   after: z.string().optional(),
+  // Multiple sub-entries rendered under the section `title`, each with its own
+  // heading. When present, templates render these instead of the section-level
+  // `subtitle`/`link`/`bullets`; when absent the section stays a single entry.
+  entries: z
+    .array(
+      z.object({
+        title: z.string(),
+        subtitle: z.string().optional(),
+        // Free-form date range shown alongside the entry, e.g. "Oct 2021 – Present".
+        period: z.string().optional(),
+        link: z.string().optional(),
+        bullets: z.array(z.string()).default([]),
+      }),
+    )
+    .optional(),
 });
 
 export const extracurricularSchema = z.object({
@@ -122,6 +141,13 @@ export const kbSchema = z.object({
   languages: z.array(languageSchema).optional(),
   awards: z.array(awardSchema).optional(),
   custom: z.array(customSectionSchema).optional(),
+
+  // Order the content sections render in for this base. Values are section ids
+  // (e.g. "experience", "education"); unknown ids are ignored at map time and
+  // the header is always pinned first. Inherited by child resumes as their
+  // default order (a child can still override it). The base editor derives this
+  // from the order the section blocks appear in the YAML.
+  section_order: z.array(z.string()).optional(),
 });
 
 export type KB = z.infer<typeof kbSchema>;
