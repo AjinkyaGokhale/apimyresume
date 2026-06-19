@@ -69,7 +69,7 @@ bases.put("/:id/cover-letter", ownerOnly, async (c) => {
   return c.json(coverLetterDto(cl));
 });
 
-bases.delete("/:id/cover-letter", ownerOnly, async (c) => {
+bases.delete("/:id/cover-letter", ownerOnly, (c) => {
   deleteBaseCoverLetter(c.req.param("id"));
   return c.body(null, 204);
 });

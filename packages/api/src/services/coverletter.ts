@@ -33,11 +33,6 @@ function requireResume(id: string): ResumeRow {
   return row;
 }
 
-/** Resolve the resume's template. Every template can render a cover letter. */
-function requireCoverLetterTemplate(row: ResumeRow): RegisteredTemplate {
-  return templateRegistry.require(row.template);
-}
-
 /** The stored cover letter for a resume, or null. */
 export function getCoverLetter(id: string): CoverLetter | null {
   const row = requireResume(id);
@@ -49,7 +44,7 @@ export function setCoverLetter(id: string, rawBody: unknown): CoverLetter {
   const row = requireResume(id);
   // Reject early when the resume's template can't render a cover letter, so a
   // caller never stores a letter that could never produce a PDF.
-  requireCoverLetterTemplate(row);
+  templateRegistry.require(row.template);
   const coverLetter = parseOrThrow(coverLetterInputSchema, rawBody ?? {});
   const updated = resumeRepo.update(id, { coverLetter });
   log.info("Cover letter saved", { id });
@@ -68,7 +63,7 @@ export async function renderStoredCoverLetter(
   id: string,
 ): Promise<{ pdf: Uint8Array; warnings: string[] }> {
   const row = requireResume(id);
-  const template = requireCoverLetterTemplate(row);
+  const template = templateRegistry.require(row.template);
   const base = baseRepo.get(row.baseId);
   if (!base) throw notFound(`Base resume '${row.baseId}' not found`, "base_not_found", "base_id");
 
@@ -88,7 +83,7 @@ export async function previewCoverLetter(
   rawBody: unknown,
 ): Promise<{ pdf: Uint8Array; warnings: string[] }> {
   const row = requireResume(id);
-  const template = requireCoverLetterTemplate(row);
+  const template = templateRegistry.require(row.template);
   const base = baseRepo.get(row.baseId);
   if (!base) throw notFound(`Base resume '${row.baseId}' not found`, "base_not_found", "base_id");
 
