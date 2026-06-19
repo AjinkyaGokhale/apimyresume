@@ -3,11 +3,11 @@ import type { ResumeRow } from "../db/schema.ts";
 import { AppError, notFound } from "../lib/errors.ts";
 import { log } from "../lib/log.ts";
 import { parseOrThrow } from "../lib/validation.ts";
-import { mergeResume } from "../pipeline/merge.ts";
+import { deepMerge, mergeResume } from "../pipeline/merge.ts";
 import { renderCoverLetterToPdf } from "../render/index.ts";
 import { templateRegistry } from "../templates/registry.ts";
 import type { RegisteredTemplate } from "../templates/types.ts";
-import { coverLetterSchema, type CoverLetter } from "../types/coverletter.ts";
+import { coverLetterInputSchema, type CoverLetter } from "../types/coverletter.ts";
 import type { Overrides } from "../types/overrides.ts";
 
 /**
@@ -16,6 +16,15 @@ import type { Overrides } from "../types/overrides.ts";
  * are stored per resume (resumes.cover_letter). PDFs are rendered on demand and
  * not persisted — letters are cheap to render and change with every body edit.
  */
+
+/**
+ * Merge a base default cover letter with a child's override diff. Objects merge
+ * key-by-key (child wins); arrays and scalars replace wholesale. Both sides are
+ * partial — an absent field on the child inherits the base value.
+ */
+export function mergeCoverLetter(base: CoverLetter, child: CoverLetter): CoverLetter {
+  return deepMerge(structuredClone(base), child);
+}
 
 /** Load the resume row or throw a 404. */
 function requireResume(id: string): ResumeRow {
@@ -53,7 +62,7 @@ export function setCoverLetter(id: string, rawBody: unknown): CoverLetter {
   // Reject early when the resume's template can't render a cover letter, so a
   // caller never stores a letter that could never produce a PDF.
   requireCoverLetterTemplate(row);
-  const coverLetter = parseOrThrow(coverLetterSchema, rawBody ?? {});
+  const coverLetter = parseOrThrow(coverLetterInputSchema,rawBody ?? {});
   const updated = resumeRepo.update(id, { coverLetter });
   log.info("Cover letter saved", { id });
   return updated!.coverLetter as CoverLetter;
@@ -84,7 +93,7 @@ export async function previewCoverLetter(
 ): Promise<{ pdf: Uint8Array; warnings: string[] }> {
   const row = requireResume(id);
   const template = requireCoverLetterTemplate(row);
-  const coverLetter = parseOrThrow(coverLetterSchema, rawBody ?? {});
+  const coverLetter = parseOrThrow(coverLetterInputSchema,rawBody ?? {});
   return renderFor(row, template, coverLetter);
 }
 

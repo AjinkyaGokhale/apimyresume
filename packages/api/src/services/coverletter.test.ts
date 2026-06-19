@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { buildCoverLetterContext } from "./coverletter.ts";
+import { buildCoverLetterContext, mergeCoverLetter } from "./coverletter.ts";
 import { templateRegistry } from "../templates/registry.ts";
 import { coverLetterInputSchema, type CoverLetter } from "../types/coverletter.ts";
 import type { ResumeRow } from "../db/schema.ts";
@@ -105,5 +105,41 @@ describe("buildCoverLetterContext", () => {
   test("passes the letter body through unchanged", () => {
     const ctx = buildCoverLetterContext(profile, row, letter);
     expect(ctx.body).toEqual(letter.body);
+  });
+});
+
+describe("mergeCoverLetter (base default + child diff)", () => {
+  test("child overrides body.intro and addressee.institution, inherits the rest", () => {
+    const base: CoverLetter = {
+      addressee: { institution: "Default Co" },
+      body: { paragraphs: ["std para"], signoff: "Best regards" },
+    };
+    const child: CoverLetter = {
+      addressee: { name: "Dr. Jane Smith", institution: "Acme Corp" },
+      body: { intro: "I am applying for the Backend role." },
+    };
+    const merged = mergeCoverLetter(base, child);
+    expect(merged.addressee).toEqual({ name: "Dr. Jane Smith", institution: "Acme Corp" });
+    expect(merged.body).toEqual({
+      paragraphs: ["std para"],
+      signoff: "Best regards",
+      intro: "I am applying for the Backend role.",
+    });
+  });
+
+  test("child paragraphs replace base paragraphs wholesale (arrays are not concatenated)", () => {
+    const base: CoverLetter = { body: { paragraphs: ["a", "b"] } };
+    const child: CoverLetter = { body: { paragraphs: ["c"] } };
+    expect(mergeCoverLetter(base, child).body?.paragraphs).toEqual(["c"]);
+  });
+
+  test("empty base + child returns the child unchanged", () => {
+    const child: CoverLetter = { body: { intro: "Hi" } };
+    expect(mergeCoverLetter({}, child)).toEqual(child);
+  });
+
+  test("base only + empty child returns the base", () => {
+    const base: CoverLetter = { body: { signoff: "Sincerely" } };
+    expect(mergeCoverLetter(base, {})).toEqual(base);
   });
 });
