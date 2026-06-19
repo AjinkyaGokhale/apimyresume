@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { buildCoverLetterContext, mergeCoverLetter } from "./coverletter.ts";
 import { templateRegistry } from "../templates/registry.ts";
 import { coverLetterInputSchema, type CoverLetter } from "../types/coverletter.ts";
-import type { ResumeRow } from "../db/schema.ts";
 
 // Load the registry once so detection runs against the real shipped templates.
 beforeAll(() => templateRegistry.load());
@@ -61,14 +60,13 @@ describe("buildCoverLetterContext", () => {
     email: "jordan@example.com",
     links: { github: "github.com/jordan", linkedin: "linkedin.com/in/jordan", site: "jordan.dev" },
   };
-  const row = { company: "Acme Corp" } as ResumeRow;
   const letter: CoverLetter = {
     addressee: { name: "Dr. Jane Smith" },
     body: { intro: "Hello", paragraphs: ["p1"], closing: "Thanks", signoff: "Sincerely" },
   };
 
   test("derives author identity and contacts from the profile", () => {
-    const ctx = buildCoverLetterContext(profile, row, letter);
+    const ctx = buildCoverLetterContext(profile, "Acme Corp", letter);
     expect(ctx.author).toBe("Jordan Michaels");
     expect(ctx.location).toBe("Austin, TX");
     // email first (mailto), then known links, then catch-all links.
@@ -84,25 +82,37 @@ describe("buildCoverLetterContext", () => {
   });
 
   test("addressee.institution falls back to the resume company", () => {
-    const ctx = buildCoverLetterContext(profile, row, letter);
+    const ctx = buildCoverLetterContext(profile, "Acme Corp", letter);
     expect(ctx.addressee.institution).toBe("Acme Corp");
   });
 
   test("keeps an explicit addressee.institution over the company", () => {
     const withInst: CoverLetter = { ...letter, addressee: { name: "X", institution: "Globex" } };
-    const ctx = buildCoverLetterContext(profile, row, withInst);
+    const ctx = buildCoverLetterContext(profile, "Acme Corp", withInst);
     expect(ctx.addressee.institution).toBe("Globex");
   });
 
   test("date defaults to a non-empty formatted string, or uses the supplied date", () => {
-    expect(buildCoverLetterContext(profile, row, letter).date).toBeTruthy();
-    const dated = buildCoverLetterContext(profile, row, { ...letter, date: "June 16, 2026" });
+    expect(buildCoverLetterContext(profile, "Acme Corp", letter).date).toBeTruthy();
+    const dated = buildCoverLetterContext(profile, "Acme Corp", { ...letter, date: "June 16, 2026" });
     expect(dated.date).toBe("June 16, 2026");
   });
 
   test("passes the letter body through unchanged", () => {
-    const ctx = buildCoverLetterContext(profile, row, letter);
-    expect(ctx.body).toEqual(letter.body);
+    const ctx = buildCoverLetterContext(profile, "Acme Corp", letter);
+    expect(ctx.body).toEqual(letter.body!);
+  });
+
+  test("tolerates a partial letter with no addressee or body", () => {
+    const ctx = buildCoverLetterContext(profile, "Acme Corp", {});
+    expect(ctx.addressee.institution).toBe("Acme Corp");
+    expect(ctx.body).toEqual({});
+    expect(ctx.author).toBe("Jordan Michaels");
+  });
+
+  test("company undefined leaves institution empty when none supplied", () => {
+    const ctx = buildCoverLetterContext(profile, undefined, {});
+    expect(ctx.addressee.institution).toBe("");
   });
 });
 
