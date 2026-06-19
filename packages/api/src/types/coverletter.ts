@@ -44,6 +44,3 @@ export const coverLetterInputSchema = z.object({
   date: z.string().optional(),
 });
 export type CoverLetter = z.infer<typeof coverLetterInputSchema>;
-
-/** Alias for backward compatibility during migration. */
-export const coverLetterSchema = coverLetterInputSchema;
