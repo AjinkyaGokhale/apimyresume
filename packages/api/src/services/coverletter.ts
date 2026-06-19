@@ -166,3 +166,45 @@ export function buildCoverLetterContext(
     body: coverLetter.body ?? {},
   };
 }
+
+// --- Base-level cover letter (the inherited default) -------------------------
+
+/** Load the base row or throw a 404. */
+function requireBase(baseId: string): BaseRow {
+  const base = baseRepo.get(baseId);
+  if (!base) throw notFound(`Base resume '${baseId}' not found`, "base_not_found");
+  return base;
+}
+
+/** The base's default cover letter, or null. */
+export function getBaseCoverLetter(baseId: string): CoverLetter | null {
+  return (requireBase(baseId).coverLetter as CoverLetter | null) ?? null;
+}
+
+/** Validate and persist (replace) the base's default cover letter. */
+export function setBaseCoverLetter(baseId: string, rawBody: unknown): CoverLetter {
+  requireBase(baseId);
+  const coverLetter = parseOrThrow(coverLetterInputSchema, rawBody ?? {});
+  const updated = baseRepo.update(baseId, { coverLetter });
+  log.info("Base cover letter saved", { baseId });
+  return updated!.coverLetter as CoverLetter;
+}
+
+/** Remove the base's default cover letter. Children keep their own diffs. */
+export function deleteBaseCoverLetter(baseId: string): void {
+  requireBase(baseId);
+  baseRepo.update(baseId, { coverLetter: null });
+  log.info("Base cover letter deleted", { baseId });
+}
+
+/** Render the base default (merged with a supplied diff) using the base profile. */
+export async function previewBaseCoverLetter(
+  baseId: string,
+  rawBody: unknown,
+): Promise<{ pdf: Uint8Array; warnings: string[] }> {
+  const base = requireBase(baseId);
+  const template = templateRegistry.require(base.template);
+  const override = parseOrThrow(coverLetterInputSchema, rawBody ?? {});
+  const effective = mergeCoverLetter((base.coverLetter as CoverLetter | null) ?? {}, override);
+  return renderWith(base, template, undefined, effective);
+}
