@@ -17,19 +17,17 @@ describe("cover-letter template detection", () => {
     expect(tpl!.coverLetterSource).toContain("sys.inputs.resume");
   });
 
-  test("basic-resume has no cover-letter variant", () => {
+  test("basic-resume falls back to the default cover letter", () => {
     const tpl = templateRegistry.get("basic-resume");
     expect(tpl).toBeTruthy();
-    expect(tpl!.hasCoverLetter).toBe(false);
-    expect(tpl!.coverLetterSource).toBeUndefined();
+    expect(tpl!.hasCoverLetter).toBe(true);
+    expect(tpl!.coverLetterSource).toContain("sys.inputs.resume");
   });
 
-  test("template summaries expose has_cover_letter", () => {
+  test("every renderable template reports has_cover_letter", () => {
     const summaries = templateRegistry.summaries();
-    const cw = summaries.find((s) => s.id === "clickworthy-resume");
-    const basic = summaries.find((s) => s.id === "basic-resume");
-    expect(cw?.has_cover_letter).toBe(true);
-    expect(basic?.has_cover_letter).toBe(false);
+    expect(summaries.length).toBeGreaterThan(0);
+    for (const s of summaries) expect(s.has_cover_letter).toBe(true);
   });
 });
 
