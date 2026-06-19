@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { buildCoverLetterContext } from "./coverletter.ts";
 import { templateRegistry } from "../templates/registry.ts";
-import { coverLetterSchema, type CoverLetter } from "../types/coverletter.ts";
+import { coverLetterInputSchema, type CoverLetter } from "../types/coverletter.ts";
 import type { ResumeRow } from "../db/schema.ts";
 
 // Load the registry once so detection runs against the real shipped templates.
@@ -33,12 +33,26 @@ describe("cover-letter template detection", () => {
   });
 });
 
-describe("coverLetterSchema", () => {
-  test("applies body defaults (signoff, empty paragraphs)", () => {
-    const cl = coverLetterSchema.parse({ addressee: { name: "Dr. Smith" }, body: {} });
-    expect(cl.body.signoff).toBe("Sincerely");
-    expect(cl.body.paragraphs).toEqual([]);
-    expect(cl.body.intro).toBe("");
+describe("coverLetterInputSchema (partial, no defaults)", () => {
+  test("does NOT fill body defaults — absent fields stay absent so they inherit", () => {
+    const cl = coverLetterInputSchema.parse({ body: { intro: "Hi" } });
+    expect(cl.body).toEqual({ intro: "Hi" });
+    expect(cl.body?.signoff).toBeUndefined();
+    expect(cl.body?.paragraphs).toBeUndefined();
+  });
+
+  test("allows an addressee with no name", () => {
+    const cl = coverLetterInputSchema.parse({ addressee: { institution: "Acme" } });
+    expect(cl.addressee).toEqual({ institution: "Acme" });
+  });
+
+  test("strips unknown keys", () => {
+    const cl = coverLetterInputSchema.parse({ body: { intro: "Hi" }, hacked: true } as unknown);
+    expect((cl as Record<string, unknown>).hacked).toBeUndefined();
+  });
+
+  test("accepts an empty object", () => {
+    expect(coverLetterInputSchema.parse({})).toEqual({});
   });
 });
 
