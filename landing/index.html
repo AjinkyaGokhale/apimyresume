@@ -405,7 +405,7 @@ $ curl -X POST https://your-domain/api/v1/resumes \
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/resumes/{id}/cover-letter/pdf</span><span class="desc">Download the cover-letter PDF</span></div>
             <div class="endpoint"><span class="method m-post">POST</span><span class="path">/resumes/{id}/cover-letter/preview</span><span class="desc">Preview a cover letter without saving</span></div>
             <div class="endpoint"><span class="method m-delete">DELETE</span><span class="path">/resumes/{id}/cover-letter</span><span class="desc">Remove the cover letter</span></div>
-            <div class="endpoint" style="opacity:.7;"><span class="path" style="color:var(--muted);">Your name &amp; contacts come from the resume profile — send only the recipient &amp; letter body. Needs a template with a cover-letter variant (e.g. Clickworthy).</span></div>
+            <div class="endpoint" style="opacity:.7;"><span class="path" style="color:var(--muted);">Your name &amp; contacts come from the resume profile — send only the recipient &amp; letter body. Works with every template, and a base resume can hold a default letter that its tailored resumes inherit.</span></div>
           </div>
 
           <div class="api-group">
@@ -413,7 +413,8 @@ $ curl -X POST https://your-domain/api/v1/resumes \
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases</span><span class="desc">List all base resumes</span></div>
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}</span><span class="desc">Get a single base</span></div>
             <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}/content</span><span class="desc">AI-optimised read of tailorable content</span></div>
-            <div class="endpoint" style="opacity:.7;"><span class="path" style="color:var(--muted);">Creating &amp; editing a base happens in the dashboard</span></div>
+            <div class="endpoint"><span class="method m-get">GET</span><span class="path">/bases/{id}/cover-letter</span><span class="desc">Read the base's default cover letter (inherited by tailored resumes)</span></div>
+            <div class="endpoint" style="opacity:.7;"><span class="path" style="color:var(--muted);">Creating &amp; editing a base — including its default cover letter — happens in the dashboard</span></div>
           </div>
 
           <div class="api-group">
