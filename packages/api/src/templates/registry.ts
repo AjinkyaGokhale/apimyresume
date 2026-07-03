@@ -24,11 +24,14 @@ const PACKAGE_IMPORT_RE = /@preview\/([a-z0-9-]+):(\d+\.\d+\.\d+)/g;
 class TemplateRegistry {
   private templates = new Map<string, RegisteredTemplate>();
   private watcher: ReturnType<typeof watch> | null = null;
+  /** Shared default cover-letter source; undefined = unloaded, null = missing. */
+  private defaultCoverLetter: string | null | undefined;
 
   /** Scan the templates directory and (re)build the registry. */
   load(): void {
     const dir = config.templatesDir;
     this.templates.clear();
+    this.defaultCoverLetter = undefined;
 
     if (!existsSync(dir)) {
       log.warn("Templates directory does not exist", { dir });
@@ -65,12 +68,13 @@ class TemplateRegistry {
 
       const missingPackages = this.checkVendoredPackages(id, source);
 
-      // Optional cover-letter variant: a self-contained cover-letter.typ that
-      // reads the cover letter context from sys.inputs (spec: cover letters).
-      const coverLetterPath = path.join(tplDir, "cover-letter.typ");
-      const coverLetterSource = existsSync(coverLetterPath)
-        ? readFileSync(coverLetterPath, "utf8")
-        : undefined;
+      // Cover-letter variant: a template's own cover-letter.typ, or the shared
+      // default when it ships none, so every template can render a letter. Both
+      // read the cover letter context from sys.inputs (spec: cover letters).
+      const ownCoverLetterPath = path.join(tplDir, "cover-letter.typ");
+      const coverLetterSource = existsSync(ownCoverLetterPath)
+        ? readFileSync(ownCoverLetterPath, "utf8")
+        : this.getDefaultCoverLetter();
 
       const tpl: RegisteredTemplate = {
         id,
@@ -112,6 +116,22 @@ class TemplateRegistry {
       }
     }
     return missing;
+  }
+
+  /**
+   * The shared default cover-letter.typ source, read once and cached. Templates
+   * that do not ship their own cover-letter.typ fall back to this, so every
+   * renderable template can produce a cover letter (spec: default cover letters).
+   */
+  private getDefaultCoverLetter(): string | undefined {
+    if (this.defaultCoverLetter === undefined) {
+      const p = path.join(config.templatesDir, "typst-coverletter", "cover-letter.typ");
+      this.defaultCoverLetter = existsSync(p) ? readFileSync(p, "utf8") : null;
+      if (this.defaultCoverLetter === null) {
+        log.warn("Default cover-letter.typ not found — templates without their own letter cannot render one", { path: p });
+      }
+    }
+    return this.defaultCoverLetter ?? undefined;
   }
 
   get(id: string): RegisteredTemplate | undefined {

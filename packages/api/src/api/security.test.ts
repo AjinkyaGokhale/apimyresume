@@ -157,6 +157,22 @@ describe("API keys cannot mutate bases or rotate the master key (owner-only → 
   test("POST /auth/rotate-key → 403", async () => {
     expect(status(await withKey("/auth/rotate-key", { method: "POST" }))).toBe(403);
   });
+
+  test("PUT /bases/:id/cover-letter → 403", async () => {
+    expect(
+      status(
+        await withKey("/bases/anything/cover-letter", {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ body: { intro: "x" } }),
+        }),
+      ),
+    ).toBe(403);
+  });
+
+  test("DELETE /bases/:id/cover-letter → 403", async () => {
+    expect(status(await withKey("/bases/anything/cover-letter", { method: "DELETE" }))).toBe(403);
+  });
 });
 
 describe("the owner session retains full access", () => {

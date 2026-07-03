@@ -17,6 +17,7 @@ export function migrate(): void {
       template      TEXT NOT NULL,
       template_lock INTEGER NOT NULL DEFAULT 0,
       data          TEXT NOT NULL,
+      cover_letter  TEXT,
       created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
       updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
@@ -100,6 +101,14 @@ export function migrate(): void {
     .all() as Array<{ name: string }>;
   if (!resumeCols.some((c) => c.name === "cover_letter")) {
     sqlite.exec("ALTER TABLE resumes ADD COLUMN cover_letter TEXT;");
+  }
+
+  // Upgrade path: databases created before base cover letters lack bases.cover_letter.
+  const baseCols = sqlite
+    .query("PRAGMA table_info(bases)")
+    .all() as Array<{ name: string }>;
+  if (!baseCols.some((c) => c.name === "cover_letter")) {
+    sqlite.exec("ALTER TABLE bases ADD COLUMN cover_letter TEXT;");
   }
 
   sqlite.exec(`

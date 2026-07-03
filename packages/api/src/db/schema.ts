@@ -19,6 +19,8 @@ export const bases = sqliteTable("bases", {
   templateLock: integer("template_lock", { mode: "boolean" }).notNull().default(false),
   /** Full canonical KB document. */
   data: text("data", { mode: "json" }).$type<KB>().notNull(),
+  /** Optional default cover letter inherited by child resumes (partial shape). */
+  coverLetter: text("cover_letter", { mode: "json" }).$type<CoverLetter>(),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
