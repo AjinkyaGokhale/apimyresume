@@ -212,9 +212,15 @@ only the **recipient** and the **letter body** — the author block (your name, 
 location) is taken from the resume's profile, so the resume and its cover letter always share
 one identity. The resume's `company` fills in the recipient's organisation if you don't.
 
-> Cover letters only work when the resume's template ships a cover-letter variant (for example
-> **Clickworthy Resume**). A resume on a template without one returns `422 cover_letter_unsupported`.
-> `GET /api/v1/resumes/{id}` reports `has_cover_letter` so you can check first.
+> **Every template can render a cover letter**, regardless of which one the resume uses. A
+> template may ship its own cover-letter design (for example **Clickworthy Resume**); any
+> template that doesn't falls back to a shared default layout. `GET /api/v1/resumes/{id}`
+> reports `has_cover_letter` (always `true`).
+
+> **Base default + inheritance.** A base resume can hold a default cover letter that all of its
+> children inherit (see [Base cover letters](#base-cover-letters) below). A child stores only
+> the fields it wants to change; at render time the child's diff is merged over the base default,
+> so a child with no letter of its own still renders the base one.
 
 ### Set or replace the cover letter
 
@@ -268,6 +274,30 @@ curl -X DELETE http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter -H "
 
 One identity, two documents — fully automatable: create the child resume, `PUT` its cover
 letter, then `GET` both PDFs.
+
+### Base cover letters
+
+A base resume can define a **default cover letter** that every child inherits. Set it once on
+the base, and any child renders that letter automatically — a child only needs to `PUT` the
+fields it wants to override (a specific recipient, a tailored intro). Editing the base default
+is **owner-only** (like the rest of the base), so these writes need an owner dashboard session,
+not an API key. Reading it works with an API key.
+
+```bash
+# Read the base's default cover letter (API key)
+curl http://localhost:3000/api/v1/bases/{id}/cover-letter -H "X-API-Key: your-key"
+
+# Set / replace the base default (owner only — same body shape as the child PUT above)
+curl -X PUT http://localhost:3000/api/v1/bases/{id}/cover-letter \
+  -H "Content-Type: application/json" -d @base-cover-letter.json
+
+# Preview the base default without saving (owner only)
+curl -X POST http://localhost:3000/api/v1/bases/{id}/cover-letter/preview \
+  -H "Content-Type: application/json" -d @base-cover-letter.json -o base-preview.pdf
+
+# Remove the base default (owner only). Children keep any letter of their own.
+curl -X DELETE http://localhost:3000/api/v1/bases/{id}/cover-letter
+```
 
 ---
 

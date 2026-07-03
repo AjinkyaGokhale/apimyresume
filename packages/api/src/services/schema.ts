@@ -121,8 +121,9 @@ export function buildSchemaDocument() {
   //
   // AUTH MODEL: child resumes are the API surface — API keys create, read,
   // tailor, update, re-render and delete them (endpoints below). The base resume
-  // is the canonical source: API keys may READ it (the two GETs below), but it is
-  // created, edited and deleted only by the human owner in the dashboard.
+  // is the canonical source: API keys may READ it (the GETs below), but it is
+  // created, edited and deleted only by the human owner in the dashboard — that
+  // includes the base's default (inheritable) cover letter.
   const baseEndpoints = [
     {
       method: "GET",
@@ -137,6 +138,45 @@ export function buildSchemaDocument() {
       path: "/api/v1/bases/{id}",
       summary: "Read a base resume. The full KB document is returned under `data`.",
       auth: "X-API-Key",
+    },
+    {
+      method: "GET",
+      path: "/api/v1/bases/{id}/cover-letter",
+      summary:
+        "Read the base's default cover letter — the letter every child of this base " +
+        "inherits unless it sets its own. 404 when the base has none.",
+      auth: "X-API-Key",
+    },
+    {
+      method: "PUT",
+      path: "/api/v1/bases/{id}/cover-letter",
+      summary:
+        "Set or replace the base's default (inheritable) cover letter. Owner only — the " +
+        "base is the canonical source the human owner controls; every child inherits this " +
+        "letter and may override any field.",
+      auth: "Owner only",
+      content_type: "application/json",
+      body:
+        "{ addressee?: { name?, institution?, address?, city?, state?, country?, zip? }, " +
+        "body?: { intro?, paragraphs?: string[], closing?, signoff? }, date? }. Same shape " +
+        "as the child cover letter below; all fields optional.",
+    },
+    {
+      method: "DELETE",
+      path: "/api/v1/bases/{id}/cover-letter",
+      summary:
+        "Remove the base's default cover letter. Children keep any cover letter of their own. " +
+        "Owner only. Returns 204.",
+      auth: "Owner only",
+    },
+    {
+      method: "POST",
+      path: "/api/v1/bases/{id}/cover-letter/preview",
+      summary:
+        "Render the base's default cover letter (optionally merged with a supplied diff) to a " +
+        "PDF (application/pdf) without saving — live preview. Owner only.",
+      auth: "Owner only",
+      content_type: "application/json",
     },
   ];
 
@@ -258,6 +298,15 @@ export function buildSchemaDocument() {
         "Render the effective cover letter (base default merged with this resume's diff) " +
         "to a PDF (application/pdf). 404 only when neither the base nor the resume has one.",
       auth: "X-API-Key",
+    },
+    {
+      method: "POST",
+      path: "/api/v1/resumes/{id}/cover-letter/preview",
+      summary:
+        "Render supplied (unsaved) cover-letter data merged over the base default to a PDF " +
+        "(application/pdf) — a live preview that does not persist anything.",
+      auth: "X-API-Key",
+      content_type: "application/json",
     },
     {
       method: "DELETE",
