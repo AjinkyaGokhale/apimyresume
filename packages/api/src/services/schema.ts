@@ -221,16 +221,18 @@ export function buildSchemaDocument() {
       method: "PUT",
       path: "/api/v1/resumes/{id}/cover-letter",
       summary:
-        "Set or replace this resume's cover letter. You supply only the recipient and the " +
-        "letter content — the author identity (name, contacts, location) is taken from the " +
-        "resume's profile. Only works when the resume's template provides a cover-letter " +
-        "variant (else 422 cover_letter_unsupported).",
+        "Set or replace this resume's cover letter (a partial override diff). You " +
+        "supply only the recipient and the letter content you want to change — the " +
+        "author identity comes from the resume's profile, and any field you omit is " +
+        "inherited from the base resume's default cover letter. Every template can " +
+        "render a cover letter.",
       auth: "X-API-Key",
       content_type: "application/json",
       body:
-        "{ addressee: { name (required), institution?, address?, city?, state?, country?, zip? }, " +
-        "body: { intro, paragraphs: string[], closing, signoff }, date? }. " +
-        "addressee.institution defaults to the resume's company; date defaults to today.",
+        "{ addressee?: { name?, institution?, address?, city?, state?, country?, zip? }, " +
+        "body?: { intro?, paragraphs?: string[], closing?, signoff? }, date? }. All fields " +
+        "optional; omitted fields inherit the base default. addressee.institution defaults " +
+        "to the resume's company; date defaults to today.",
       example: {
         request: {
           addressee: { name: "Dr. Jane Smith", institution: "Acme Corp", city: "Tech City", state: "CA", zip: "90210" },
@@ -252,7 +254,9 @@ export function buildSchemaDocument() {
     {
       method: "GET",
       path: "/api/v1/resumes/{id}/cover-letter/pdf",
-      summary: "Render the stored cover letter to a PDF (application/pdf). 404 when none set.",
+      summary:
+        "Render the effective cover letter (base default merged with this resume's diff) " +
+        "to a PDF (application/pdf). 404 only when neither the base nor the resume has one.",
       auth: "X-API-Key",
     },
     {

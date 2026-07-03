@@ -19,3 +19,10 @@ dist/
 packages/dashboard/build/
 packages/dashboard/.svelte-kit/
 
+# Vendored upstream cover-letter package: keep it on disk for reference but track
+# only the adapted default template (and its MIT license) used by the registry.
+# Everything else here — including its embedded .git — stays out of this repo.
+/templates/typst-coverletter/*
+!/templates/typst-coverletter/cover-letter.typ
+!/templates/typst-coverletter/LICENSE
+

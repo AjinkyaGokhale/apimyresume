@@ -3,7 +3,8 @@ import YAML from "yaml";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { readBody } from "../body.ts";
-import { baseDto } from "../dto.ts";
+import { baseDto, coverLetterDto } from "../dto.ts";
+import { notFound } from "../../lib/errors.ts";
 import { ownerOnly } from "../middleware/auth.ts";
 import {
   createBase,
@@ -14,6 +15,12 @@ import {
   updateBase,
   updateExperienceBullets,
 } from "../../services/base.ts";
+import {
+  deleteBaseCoverLetter,
+  getBaseCoverLetter,
+  previewBaseCoverLetter,
+  setBaseCoverLetter,
+} from "../../services/coverletter.ts";
 import { baseThumbnail } from "../../services/resume.ts";
 
 /** Base resume routes (spec §3). */
@@ -46,6 +53,33 @@ bases.delete("/:id", ownerOnly, async (c) => {
   const cascade = c.req.query("cascade") === "true";
   await deleteBase(c.req.param("id"), { cascade });
   return c.body(null, 204);
+});
+
+// Base default cover letter (inherited by child resumes). Reads are auth'd like
+// the rest of v1; writes are owner-only.
+bases.get("/:id/cover-letter", (c) => {
+  const id = c.req.param("id");
+  const cl = getBaseCoverLetter(id);
+  if (!cl) throw notFound(`Base '${id}' has no cover letter`, "cover_letter_not_found");
+  return c.json(coverLetterDto(cl));
+});
+
+bases.put("/:id/cover-letter", ownerOnly, async (c) => {
+  const cl = setBaseCoverLetter(c.req.param("id"), await readBody(c));
+  return c.json(coverLetterDto(cl));
+});
+
+bases.delete("/:id/cover-letter", ownerOnly, (c) => {
+  deleteBaseCoverLetter(c.req.param("id"));
+  return c.body(null, 204);
+});
+
+bases.post("/:id/cover-letter/preview", ownerOnly, async (c) => {
+  const { pdf, warnings } = await previewBaseCoverLetter(c.req.param("id"), await readBody(c));
+  c.header("Content-Type", "application/pdf");
+  c.header("Cache-Control", "no-store");
+  if (warnings.length) c.header("X-Render-Warnings", warnings.join("; "));
+  return c.body(pdf.buffer as ArrayBuffer);
 });
 
 /**
