@@ -11,12 +11,17 @@ export interface Addressee {
 export interface CoverLetter {
   addressee: Addressee;
   body: {
+    subject?: string;
     intro?: string;
     paragraphs?: string[];
     closing?: string;
     signoff?: string;
+    enclosures?: string[];
   };
   date?: string;
+  lang?: "en" | "de";
+  /** Letter-design id; absent = the resume template's letter or shared default. */
+  template?: string;
 }
 
 export interface ResumeDto {

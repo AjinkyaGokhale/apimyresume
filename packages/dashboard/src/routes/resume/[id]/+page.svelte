@@ -238,7 +238,7 @@
           zip: "",
           country: "",
         },
-        body: { intro: "", paragraphs: [""], closing: "", signoff: "Sincerely" },
+        body: { subject: "", intro: "", paragraphs: [""], closing: "", signoff: "Sincerely", enclosures: [] },
       },
       { lineWidth: 0 },
     );
@@ -246,6 +246,46 @@
 
   let clYaml = $state(buildCoverLetterYaml(r));
   let clError = $state<string | null>(null);
+
+  // Selectable letter designs; the dropdown reads/writes the YAML's `template`
+  // key, so the YAML stays the single source of truth for save + preview.
+  type LetterTemplateSummary = { id: string; name: string; description: string; default: boolean };
+  let letterTemplates = $state<LetterTemplateSummary[]>([]);
+  let clTemplate = $state(readClTemplate(buildCoverLetterYaml(r)));
+
+  function readClTemplate(yaml: string): string {
+    try {
+      const t = (YAML.parse(yaml) ?? {}).template;
+      return typeof t === "string" ? t : "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function loadLetterTemplates() {
+    if (letterTemplates.length) return;
+    try {
+      const res = await fetch(`${getApiUrl()}/api/v1/templates/cover-letters`, {
+        headers: { "X-API-Key": getApiKey() },
+      });
+      if (res.ok) letterTemplates = await res.json();
+    } catch {
+      // Listing is a nicety — without it the dropdown simply stays hidden.
+    }
+  }
+
+  function onClTemplateChange() {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = YAML.parse(clYaml) ?? {};
+    } catch {
+      return; // invalid YAML — leave it to the editor's own error display
+    }
+    if (clTemplate) parsed.template = clTemplate;
+    else delete parsed.template;
+    clYaml = YAML.stringify(parsed, { lineWidth: 0 });
+    onClInput();
+  }
   let clValidYaml = $state(true);
   let clPreviewUrl = $state("");
   let clPreviewLoading = $state(false);
@@ -293,6 +333,8 @@
       YAML.parse(clYaml);
       clError = null;
       clValidYaml = true;
+      // Keep the design dropdown in sync with hand-edited YAML.
+      clTemplate = readClTemplate(clYaml);
     } catch (e) {
       clError = (e as Error).message;
       clValidYaml = false;
@@ -361,6 +403,7 @@
   // Run the active mode's preview when the page mounts or the mode switches.
   $effect(() => {
     if (mode === "cover") {
+      loadLetterTemplates();
       if (hasCoverLetter) runClPreview();
     } else {
       runPreview();
@@ -502,6 +545,17 @@
             </button>
           </div>
         </div>
+        {#if letterTemplates.length}
+          <label class="cl-design">
+            <span class="label">Design</span>
+            <select bind:value={clTemplate} onchange={onClTemplateChange}>
+              <option value="">Template default</option>
+              {#each letterTemplates as t (t.id)}
+                <option value={t.id} title={t.description}>{t.name}{t.default ? " (default)" : ""}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
         <textarea
           class="yaml-editor"
           bind:value={clYaml}
@@ -719,6 +773,27 @@
     border-top: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
+  }
+
+  .cl-design {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    flex-shrink: 0;
+  }
+
+  .cl-design select {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
   }
 
   .pdf-frame {
