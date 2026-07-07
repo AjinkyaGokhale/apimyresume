@@ -214,8 +214,9 @@ one identity. The resume's `company` fills in the recipient's organisation if yo
 
 > **Every template can render a cover letter**, regardless of which one the resume uses. A
 > template may ship its own cover-letter design (for example **Clickworthy Resume**); any
-> template that doesn't falls back to a shared default layout. `GET /api/v1/resumes/{id}`
-> reports `has_cover_letter` (always `true`).
+> template that doesn't falls back to a shared default layout following the **DIN 5008**
+> business-letter norm (A4, sender block top right, recipient block left, bold subject line,
+> enclosure list). `GET /api/v1/resumes/{id}` reports `has_cover_letter` (always `true`).
 
 > **Base default + inheritance.** A base resume can hold a default cover letter that all of its
 > children inherit (see [Base cover letters](#base-cover-letters) below). A child stores only
@@ -237,13 +238,15 @@ curl -X PUT http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter \
       "city": "Tech City", "state": "CA", "zip": "90210", "country": "USA"
     },
     "body": {
+      "subject": "Application for Senior Backend Engineer (Ref. 2026-42)",
       "intro": "I am writing to apply for the Senior Backend Engineer position.",
       "paragraphs": [
         "At Acme I scaled Go services on Kubernetes to 10k+ req/s.",
         "I thrive in distributed-systems work and cross-team collaboration."
       ],
       "closing": "Thank you for considering my application.",
-      "signoff": "Sincerely"
+      "signoff": "Sincerely",
+      "enclosures": ["Resume", "References"]
     }
   }'
 ```
@@ -251,7 +254,17 @@ curl -X PUT http://localhost:3000/api/v1/resumes/resume_xxx/cover-letter \
 - `addressee.name` is required; the rest of the address block is optional. `institution`
   defaults to the resume's `company`.
 - `body` fields are plain text. `paragraphs` is a list; the salutation (“Dear …,”) and your
-  signature are added automatically. `date` is optional and defaults to today.
+  signature are added automatically. `subject` renders as a bold subject line and
+  `enclosures` as an enclosure list after the signature (templates that predate these fields
+  ignore them). `date` is optional and defaults to today.
+- `lang` (top-level, `"en"` or `"de"`, default `"en"`) localizes the default-layout letter's
+  fixed strings — salutation fallback, signoff, enclosure label — and the default date format.
+- `template` (top-level, optional) picks the **letter design** independently of the resume
+  template. List the available designs with `GET /api/v1/templates/cover-letters` →
+  `[{ id, name, description, default }]`. Absent = the resume template's own letter design,
+  falling back to the shared default (`din5008-coverletter`). Unknown ids are rejected with
+  `422`. Like every other field it inherits from the base letter, so a base can set a house
+  design and children can override it per application.
 
 ### Read, render, remove
 
