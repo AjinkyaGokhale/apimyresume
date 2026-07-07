@@ -21,33 +21,70 @@ const REQUIRED_FILES = ["resume.typ", "map.json", "config.json"] as const;
 /** Matches `@preview/<name>:<version>` package imports inside resume.typ. */
 const PACKAGE_IMPORT_RE = /@preview\/([a-z0-9-]+):(\d+\.\d+\.\d+)/g;
 
+/** The letter design used when neither the letter nor its template picks one. */
+export const DEFAULT_LETTER_TEMPLATE_ID = "din5008-coverletter";
+
+/** A selectable cover-letter design: any template dir shipping a cover-letter.typ. */
+export interface LetterTemplate {
+  id: string;
+  source: string;
+  name: string;
+  description: string;
+}
+
 class TemplateRegistry {
   private templates = new Map<string, RegisteredTemplate>();
+  private letterTemplates = new Map<string, LetterTemplate>();
   private watcher: ReturnType<typeof watch> | null = null;
-  /** Shared default cover-letter source; undefined = unloaded, null = missing. */
-  private defaultCoverLetter: string | null | undefined;
 
   /** Scan the templates directory and (re)build the registry. */
   load(): void {
     const dir = config.templatesDir;
     this.templates.clear();
-    this.defaultCoverLetter = undefined;
+    this.letterTemplates.clear();
 
     if (!existsSync(dir)) {
       log.warn("Templates directory does not exist", { dir });
       return;
     }
 
-    for (const entry of readdirSync(dir)) {
-      const tplDir = path.join(dir, entry);
-      if (!statSync(tplDir).isDirectory()) continue;
-      this.loadOne(entry, tplDir);
-    }
+    const entries = readdirSync(dir).filter((entry) =>
+      statSync(path.join(dir, entry)).isDirectory(),
+    );
+    // Letter catalog first: loadOne resolves cover-letter fallbacks through it.
+    for (const entry of entries) this.loadLetterTemplate(entry, path.join(dir, entry));
+    for (const entry of entries) this.loadOne(entry, path.join(dir, entry));
 
+    if (!this.letterTemplates.has(DEFAULT_LETTER_TEMPLATE_ID)) {
+      log.warn("Default cover-letter template not found — templates without their own letter cannot render one", {
+        id: DEFAULT_LETTER_TEMPLATE_ID,
+      });
+    }
     log.info("Template registry loaded", {
       count: this.templates.size,
       templates: [...this.templates.keys()],
+      letterTemplates: [...this.letterTemplates.keys()],
     });
+  }
+
+  /**
+   * Register a directory's cover-letter.typ as a selectable letter design.
+   * Name/description come from config.json when present (read leniently:
+   * letter-only dirs are not full templates and skip strict validation).
+   */
+  private loadLetterTemplate(id: string, tplDir: string): void {
+    const p = path.join(tplDir, "cover-letter.typ");
+    if (!existsSync(p)) return;
+    let name = id;
+    let description = "";
+    try {
+      const cfg = readJson(path.join(tplDir, "config.json")) as Record<string, unknown>;
+      if (typeof cfg.name === "string") name = cfg.name;
+      if (typeof cfg.description === "string") description = cfg.description;
+    } catch {
+      // No or invalid config.json — the id is a good enough display name.
+    }
+    this.letterTemplates.set(id, { id, source: readFileSync(p, "utf8"), name, description });
   }
 
   /** Load (or reload) a single template directory by id. Returns success. */
@@ -71,10 +108,9 @@ class TemplateRegistry {
       // Cover-letter variant: a template's own cover-letter.typ, or the shared
       // default when it ships none, so every template can render a letter. Both
       // read the cover letter context from sys.inputs (spec: cover letters).
-      const ownCoverLetterPath = path.join(tplDir, "cover-letter.typ");
-      const coverLetterSource = existsSync(ownCoverLetterPath)
-        ? readFileSync(ownCoverLetterPath, "utf8")
-        : this.getDefaultCoverLetter();
+      const coverLetterSource = (
+        this.letterTemplates.get(id) ?? this.letterTemplates.get(DEFAULT_LETTER_TEMPLATE_ID)
+      )?.source;
 
       const tpl: RegisteredTemplate = {
         id,
@@ -118,22 +154,6 @@ class TemplateRegistry {
     return missing;
   }
 
-  /**
-   * The shared default cover-letter.typ source, read once and cached. Templates
-   * that do not ship their own cover-letter.typ fall back to this, so every
-   * renderable template can produce a cover letter (spec: default cover letters).
-   */
-  private getDefaultCoverLetter(): string | undefined {
-    if (this.defaultCoverLetter === undefined) {
-      const p = path.join(config.templatesDir, "typst-coverletter", "cover-letter.typ");
-      this.defaultCoverLetter = existsSync(p) ? readFileSync(p, "utf8") : null;
-      if (this.defaultCoverLetter === null) {
-        log.warn("Default cover-letter.typ not found — templates without their own letter cannot render one", { path: p });
-      }
-    }
-    return this.defaultCoverLetter ?? undefined;
-  }
-
   get(id: string): RegisteredTemplate | undefined {
     return this.templates.get(id);
   }
@@ -147,6 +167,26 @@ class TemplateRegistry {
 
   has(id: string): boolean {
     return this.templates.has(id);
+  }
+
+  getLetterTemplate(id: string): LetterTemplate | undefined {
+    return this.letterTemplates.get(id);
+  }
+
+  hasLetterTemplate(id: string): boolean {
+    return this.letterTemplates.has(id);
+  }
+
+  /** Selectable letter designs for pickers, default first then alphabetical. */
+  letterTemplateSummaries(): Array<{ id: string; name: string; description: string; default: boolean }> {
+    return [...this.letterTemplates.values()]
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        default: t.id === DEFAULT_LETTER_TEMPLATE_ID,
+      }))
+      .sort((a, b) => Number(b.default) - Number(a.default) || a.id.localeCompare(b.id));
   }
 
   list(): RegisteredTemplate[] {

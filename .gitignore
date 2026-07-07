@@ -24,5 +24,6 @@ packages/dashboard/.svelte-kit/
 # Everything else here — including its embedded .git — stays out of this repo.
 /templates/typst-coverletter/*
 !/templates/typst-coverletter/cover-letter.typ
+!/templates/typst-coverletter/config.json
 !/templates/typst-coverletter/LICENSE
 

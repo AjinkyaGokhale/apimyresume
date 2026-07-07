@@ -27,17 +27,21 @@ export async function renderToPdf(
  * addressee + body) and serialised to JSON, so we bypass the field mapper and
  * feed the context straight to the template's cover-letter.typ. The compiler's
  * `resume` input key is reused as the generic document-context input.
+ * `letterSource` overrides the template's own letter when the cover letter
+ * picks a different design (its `template` field).
  */
 export async function renderCoverLetterToPdf(
   template: RegisteredTemplate,
   contextJson: string,
+  letterSource?: string,
 ): Promise<{ pdf: Uint8Array; warnings: string[] }> {
-  if (!template.coverLetterSource) {
+  const source = letterSource ?? template.coverLetterSource;
+  if (!source) {
     throw new Error(`Template '${template.id}' has no cover-letter variant`);
   }
   const out = await workerPool.render({
     templateId: template.id,
-    source: template.coverLetterSource,
+    source,
     resumeJson: contextJson,
     format: "pdf",
   });

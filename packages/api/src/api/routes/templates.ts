@@ -8,6 +8,10 @@ export const templates = new Hono();
 
 templates.get("/", (c) => c.json(templateRegistry.summaries()));
 
+// Selectable cover-letter designs (any template dir shipping a cover-letter.typ).
+// A letter picks one via its `template` field; absent = the resume template's own.
+templates.get("/cover-letters", (c) => c.json(templateRegistry.letterTemplateSummaries()));
+
 templates.get("/:id/map", (c) => {
   const tpl = templateRegistry.require(c.req.param("id"));
   return c.json(tpl.map);
