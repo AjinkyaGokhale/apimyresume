@@ -1,7 +1,8 @@
 <script lang="ts">
   import YAML from "yaml";
+  import { invalidateAll } from "$app/navigation";
   import Icon from "$lib/Icon.svelte";
-  import { handleYamlKeydown, formatYaml } from "$lib/yamlEditor";
+  import { handleYamlKeydown, formatYaml, PREVIEW_DEBOUNCE_MS } from "$lib/yamlEditor";
   import { getApiKey, getApiUrl } from "$lib/api";
   import type { ResumeDto } from "$lib/types";
   import type { PageData } from "./$types";
@@ -168,7 +169,7 @@
     }
     if (debounceTimer) clearTimeout(debounceTimer);
     if (!isValidYaml) return;
-    debounceTimer = setTimeout(runPreview, 500);
+    debounceTimer = setTimeout(runPreview, PREVIEW_DEBOUNCE_MS);
   }
 
   /** Pretty-print the whole document on demand (no-op if currently invalid). */
@@ -213,6 +214,11 @@
         const err = await regenRes.json().catch(() => ({}));
         throw new Error((err as { error?: string }).error ?? "Failed to regenerate PDF");
       }
+
+      // Regenerate wrote a new versioned PDF at a new `pdf_url`; reload the page
+      // data so the Download button points at the freshly rendered file rather
+      // than the previous version.
+      await invalidateAll();
 
       showToast("Saved");
     } catch (e) {
@@ -341,7 +347,7 @@
     }
     if (clDebounceTimer) clearTimeout(clDebounceTimer);
     if (!clValidYaml) return;
-    clDebounceTimer = setTimeout(runClPreview, 500);
+    clDebounceTimer = setTimeout(runClPreview, PREVIEW_DEBOUNCE_MS);
   }
 
   function onClFormat() {

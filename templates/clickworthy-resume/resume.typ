@@ -86,6 +86,17 @@
 
 // ===== Entry helpers (clickworthy grid style) =====
 
+// Render a plain data string with lightweight **bold** support: text between
+// paired ** markers is emphasised, everything else is emitted verbatim. Only
+// bold is interpreted (no other markup is evaluated), so arbitrary user text
+// stays safe and predictable.
+#let md(s) = {
+  let parts = s.split("**")
+  for (i, part) in parts.enumerate() {
+    if calc.rem(i, 2) == 1 { strong(part) } else { part }
+  }
+}
+
 // Title on the left (bold + emph subtitle), date/location on the right.
 #let entry(title: "", subtitle: "", date: "", location: "") = {
   pad(
@@ -106,7 +117,7 @@
 
 #let bullets(items) = {
   for b in items [
-    - #b
+    - #md(b)
   ]
 }
 
@@ -172,6 +183,7 @@
     )
     #if ed.at("gpa", default: "") != "" [ #emph[GPA: #ed.gpa] \ ]
     #if ed.at("honors", default: "") != "" [ #emph[#ed.honors] \ ]
+    #bullets(ed.at("bullets", default: ()))
     #v(3pt)
   ]
 ]
@@ -202,7 +214,7 @@
       subtitle: p.at("role", default: ""),
       date: p.at("period", default: ""),
     )
-    #if p.at("description", default: "") != "" [ #p.description \ ]
+    #if p.at("description", default: "") != "" [ #md(p.description) \ ]
     #bullets(p.at("bullets", default: ()))
     #v(3pt)
   ]
@@ -216,7 +228,7 @@
       subtitle: a.at("issuer", default: ""),
       date: str(a.at("year", default: "")),
     )
-    #if a.at("description", default: "") != "" [ #a.description \ ]
+    #if a.at("description", default: "") != "" [ #md(a.description) \ ]
     #v(3pt)
   ]
 ]

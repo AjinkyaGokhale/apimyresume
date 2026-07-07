@@ -3,6 +3,15 @@
 // indent/outdent, and an on-demand pretty-print via the `yaml` dependency.
 import YAML from "yaml";
 
+/**
+ * Idle delay before an editor with live preview re-renders after the user
+ * stops typing. Shared by every auto-previewing YAML editor so the "render
+ * once you pause" feel is consistent. Long enough to sit through the natural
+ * pauses within a burst of typing, so the preview fires only when editing
+ * actually stops — not on every keystroke.
+ */
+export const PREVIEW_DEBOUNCE_MS = 1000;
+
 /** Insert text at the caret, keeping native undo and firing an `input` event. */
 function insertAtCaret(ta: HTMLTextAreaElement, text: string) {
   ta.focus();

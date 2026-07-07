@@ -134,10 +134,12 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
-    // Cmd/Ctrl+S compiles the preview (and prevents the browser save dialog).
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
-      e.preventDefault();
-      if (isValidYaml && !previewLoading) compile();
+    // Cmd/Ctrl+S is swallowed so it never triggers the browser's save dialog;
+    // rendering the preview is manual, via the Compile button. Written as nested
+    // ifs (not `(meta || ctrl) && key`) because the build's codegen drops the
+    // grouping parens, which would otherwise swallow every Cmd-shortcut on macOS.
+    if (e.metaKey || e.ctrlKey) {
+      if (e.key.toLowerCase() === "s") e.preventDefault();
     }
   }
 
@@ -219,7 +221,7 @@
             class="btn primary compile"
             onclick={compile}
             disabled={!isValidYaml || previewLoading}
-            title="Compile preview (⌘/Ctrl + S)"
+            title="Compile preview"
           >
             {#if previewLoading}
               <span class="spin"><Icon name="refresh" size={13} /></span> Compiling…

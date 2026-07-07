@@ -56,6 +56,17 @@
   }
 }
 
+// Render a plain data string with lightweight **bold** support: text between
+// paired ** markers is emphasised, everything else is emitted verbatim. Only
+// bold is interpreted (no other markup is evaluated), so arbitrary user text
+// stays safe and predictable.
+#let md(s) = {
+  let parts = s.split("**")
+  for (i, part) in parts.enumerate() {
+    if calc.rem(i, 2) == 1 { strong(part) } else { part }
+  }
+}
+
 // ===== Entry components =====
 #let edu_item(name: "", degree: "", location: "", date: "", bullets: ()) = {
   set block(above: 0.7em, below: 1em)
@@ -65,7 +76,7 @@
       align(left)[*#name* \ _#degree _],
       align(right)[#location \ _#date _],
     )
-    #if bullets.len() > 0 [#list(..bullets)]
+    #if bullets.len() > 0 [#list(..bullets.map(md))]
   ])
 }
 
@@ -77,7 +88,7 @@
       align(left)[*#role* \ _#name _],
       align(right)[#date \ _#location _],
     )
-    #if bullets.len() > 0 [#list(..bullets)]
+    #if bullets.len() > 0 [#list(..bullets.map(md))]
   ])
 }
 
@@ -85,8 +96,8 @@
   set block(above: 0.7em, below: 1em)
   pad(left: 1em, right: 0.5em, box[
     *#name*#if skills != "" [ | _#skills _] #h(1fr) #date
-    #if desc != "" [ \ #desc]
-    #if bullets.len() > 0 [#list(..bullets)]
+    #if desc != "" [ \ #md(desc)]
+    #if bullets.len() > 0 [#list(..bullets.map(md))]
   ])
 }
 
@@ -94,7 +105,7 @@
   set block(above: 0.7em, below: 1em)
   pad(left: 1em, right: 0.5em, box[
     #grid(columns: (3fr, 1fr), align(left)[*#activity*], align(right)[_#date _])
-    #if bullets.len() > 0 [#list(..bullets)]
+    #if bullets.len() > 0 [#list(..bullets.map(md))]
   ])
 }
 
@@ -128,7 +139,7 @@
     [#link(if url.starts-with("http") { url } else { "https://" + url })[#url]\ ]
   }
   if bls.len() > 0 {
-    pad(left: 1em, right: 0.5em, list(..bls))
+    pad(left: 1em, right: 0.5em, list(..bls.map(md)))
   }
 }
 #let render-custom(c) = {

@@ -48,6 +48,9 @@ export const educationSchema = z.object({
   thesis: z.string().optional(),
   gpa: z.string().optional(),
   honors: z.string().optional(),
+  // Optional detail lines under the entry (e.g. relevant coursework). Templates
+  // render these as bullets; absent when the entry has none.
+  bullets: z.array(z.string()).optional(),
 });
 
 export const skillSchema = z.object({

@@ -52,6 +52,17 @@
 
 // ===== Components =====
 
+// Render a plain data string with lightweight **bold** support: text between
+// paired ** markers is emphasised, everything else is emitted verbatim. Only
+// bold is interpreted (no other markup is evaluated), so arbitrary user text
+// stays safe and predictable.
+#let md(s) = {
+  let parts = s.split("**")
+  for (i, part) in parts.enumerate() {
+    if calc.rem(i, 2) == 1 { strong(part) } else { part }
+  }
+}
+
 // Two rows × two columns: left column left-aligned, right column right-aligned.
 #let two-by-two(cols, r1c1, r1c2, r2c1, r2c2) = {
   grid(
@@ -135,7 +146,7 @@
     #link(if url.starts-with("http") { url } else { "https://" + url })[#url] #linebreak()
   ]
   #for b in bls [
-    - #b
+    - #md(b)
   ]
 ]
 #let render-custom(c) = [
@@ -197,7 +208,7 @@
       - Thesis: #ed.thesis
     ]
     #for b in ed.at("bullets", default: ()) [
-      - #b
+      - #md(b)
     ]
     #v(3pt)
   ]
@@ -215,7 +226,7 @@
       job.at("period", default: ""),
     )
     #for b in job.at("bullets", default: ()) [
-      - #b
+      - #md(b)
     ]
     #v(3pt)
   ]
@@ -231,10 +242,10 @@
       p.at("period", default: ""),
     )
     #if p.at("description", default: "") != "" [
-      #p.description
+      #md(p.description)
     ]
     #for b in p.at("bullets", default: ()) [
-      - #b
+      - #md(b)
     ]
     #v(3pt)
   ]
@@ -268,7 +279,7 @@
       align(right)[#a.at("year", default: "")],
     )
     #if a.at("description", default: "") != "" [
-      #a.description
+      #md(a.description)
     ]
     #v(2pt)
   ]
@@ -283,7 +294,7 @@
       align(right)[#ex.at("period", default: "")],
     )
     #for b in ex.at("bullets", default: ()) [
-      - #b
+      - #md(b)
     ]
     #v(3pt)
   ]

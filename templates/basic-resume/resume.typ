@@ -20,6 +20,17 @@
 
 // ===== Template Functions =====
 
+// Render a plain data string with lightweight **bold** support: text between
+// paired ** markers is emphasised, everything else is emitted verbatim. Only
+// bold is interpreted (no other markup is evaluated), so arbitrary user text
+// stays safe and predictable.
+#let md(s) = {
+  let parts = s.split("**")
+  for (i, part) in parts.enumerate() {
+    if calc.rem(i, 2) == 1 { strong(part) } else { part }
+  }
+}
+
 // Date helper function
 #let dates-helper(start-date: "", end-date: "") = {
   if start-date == "" {
@@ -233,7 +244,7 @@
     #link(if url.starts-with("http") { url } else { "https://" + url })[#url] #linebreak()
   ]
   #for b in bls [
-    - #b
+    - #md(b)
   ]
 ]
 #let render-custom(c) = [
@@ -281,7 +292,7 @@
     )
     #if "bullets" in ed [
       #for b in ed.bullets [
-        - #b
+        - #md(b)
       ]
     ]
     #v(3pt)
@@ -298,7 +309,7 @@
       dates: dates-helper(start-date: "", end-date: job.at("period", default: "")),
     )
     #for b in job.at("bullets", default: ()) [
-      - #b
+      - #md(b)
     ]
     #v(3pt)
   ]
@@ -314,11 +325,11 @@
       dates: dates-helper(start-date: "", end-date: p.at("period", default: "")),
     )
     #if "description" in p [
-      #p.description
+      #md(p.description)
     ]
     #if "bullets" in p [
       #for b in p.bullets [
-        - #b
+        - #md(b)
       ]
     ]
     #v(3pt)
@@ -334,7 +345,7 @@
     )
     #if "bullets" in ex [
       #for b in ex.bullets [
-        - #b
+        - #md(b)
       ]
     ]
     #v(3pt)
