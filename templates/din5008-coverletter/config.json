@@ -1,0 +1,4 @@
+{
+  "name": "DIN 5008 Letter",
+  "description": "Formal business letter following the German DIN 5008 norm: A4, sender block top right, recipient block left, bold subject line, ragged-right body and enclosure list. Localized defaults for English and German. The shared default cover-letter design."
+}
