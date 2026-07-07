@@ -23,6 +23,31 @@ describe("cover-letter template detection", () => {
     expect(tpl!.coverLetterSource).toContain("sys.inputs.resume");
   });
 
+  test("the shared default is the DIN 5008 letter", () => {
+    const tpl = templateRegistry.get("basic-resume");
+    expect(tpl!.coverLetterSource).toContain("DIN 5008");
+  });
+
+  test("letter-template catalog lists every dir shipping a cover-letter.typ", () => {
+    const ids = templateRegistry.letterTemplateSummaries().map((t) => t.id);
+    expect(ids).toContain("din5008-coverletter");
+    expect(ids).toContain("typst-coverletter");
+    expect(ids).toContain("clickworthy-resume");
+  });
+
+  test("catalog marks din5008 as the default and puts it first", () => {
+    const summaries = templateRegistry.letterTemplateSummaries();
+    expect(summaries[0]!.id).toBe("din5008-coverletter");
+    expect(summaries[0]!.default).toBe(true);
+    expect(summaries.filter((t) => t.default)).toHaveLength(1);
+  });
+
+  test("catalog entries carry display names from config.json", () => {
+    const din = templateRegistry.getLetterTemplate("din5008-coverletter");
+    expect(din!.name).toBe("DIN 5008 Letter");
+    expect(din!.source).toContain("sys.inputs.resume");
+  });
+
   test("every renderable template reports has_cover_letter", () => {
     const summaries = templateRegistry.summaries();
     expect(summaries.length).toBeGreaterThan(0);
@@ -50,6 +75,30 @@ describe("coverLetterInputSchema (partial, no defaults)", () => {
 
   test("accepts an empty object", () => {
     expect(coverLetterInputSchema.parse({})).toEqual({});
+  });
+
+  test("accepts DIN 5008 fields: body.subject, body.enclosures, lang", () => {
+    const cl = coverLetterInputSchema.parse({
+      body: { subject: "Application for X", enclosures: ["Resume", "References"] },
+      lang: "de",
+    });
+    expect(cl.body?.subject).toBe("Application for X");
+    expect(cl.body?.enclosures).toEqual(["Resume", "References"]);
+    expect(cl.lang).toBe("de");
+  });
+
+  test("rejects an unknown lang", () => {
+    expect(() => coverLetterInputSchema.parse({ lang: "fr" })).toThrow();
+  });
+
+  test("does NOT default lang — absent stays absent so it inherits", () => {
+    expect(coverLetterInputSchema.parse({}).lang).toBeUndefined();
+  });
+
+  test("accepts a letter-design choice via template", () => {
+    const cl = coverLetterInputSchema.parse({ template: "typst-coverletter" });
+    expect(cl.template).toBe("typst-coverletter");
+    expect(coverLetterInputSchema.parse({}).template).toBeUndefined();
   });
 });
 
@@ -114,6 +163,25 @@ describe("buildCoverLetterContext", () => {
     const ctx = buildCoverLetterContext(profile, undefined, {});
     expect(ctx.addressee.institution).toBe("");
   });
+
+  test("exposes the profile phone as its own field (empty when absent)", () => {
+    const ctx = buildCoverLetterContext({ ...profile, phone: "+49 170 1234567" }, undefined, {});
+    expect(ctx.phone).toBe("+49 170 1234567");
+    expect(buildCoverLetterContext(profile, undefined, {}).phone).toBe("");
+  });
+
+  test("lang passes through and defaults to en", () => {
+    expect(buildCoverLetterContext(profile, undefined, {}).lang).toBe("en");
+    expect(buildCoverLetterContext(profile, undefined, { lang: "de" }).lang).toBe("de");
+  });
+
+  test("default date is localized by lang", () => {
+    const en = buildCoverLetterContext(profile, undefined, {}).date;
+    const de = buildCoverLetterContext(profile, undefined, { lang: "de" }).date;
+    // en-US: "July 7, 2026" — comma between day and year; de-DE: "7. Juli 2026".
+    expect(en).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/);
+    expect(de).toMatch(/^\d{1,2}\. [A-ZÄÖÜ][a-zä]+ \d{4}$/);
+  });
 });
 
 describe("mergeCoverLetter (base default + child diff)", () => {
@@ -149,5 +217,13 @@ describe("mergeCoverLetter (base default + child diff)", () => {
   test("base only + empty child returns the base", () => {
     const base: CoverLetter = { body: { signoff: "Sincerely" } };
     expect(mergeCoverLetter(base, {})).toEqual(base);
+  });
+
+  test("a child inherits the base's letter design and can override it", () => {
+    const base: CoverLetter = { template: "typst-coverletter" };
+    expect(mergeCoverLetter(base, {}).template).toBe("typst-coverletter");
+    expect(mergeCoverLetter(base, { template: "din5008-coverletter" }).template).toBe(
+      "din5008-coverletter",
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { baseRepo, resumeRepo } from "../db/repo.ts";
 import type { BaseRow, ResumeRow } from "../db/schema.ts";
-import { notFound } from "../lib/errors.ts";
+import { notFound, unprocessable } from "../lib/errors.ts";
 import { log } from "../lib/log.ts";
 import { parseOrThrow } from "../lib/validation.ts";
 import { deepMerge, mergeResume } from "../pipeline/merge.ts";
@@ -46,6 +46,7 @@ export function setCoverLetter(id: string, rawBody: unknown): CoverLetter {
   // caller never stores a letter that could never produce a PDF.
   templateRegistry.require(row.template);
   const coverLetter = parseOrThrow(coverLetterInputSchema, rawBody ?? {});
+  assertKnownLetterTemplate(coverLetter);
   const updated = resumeRepo.update(id, { coverLetter });
   log.info("Cover letter saved", { id });
   return updated!.coverLetter as CoverLetter;
@@ -101,14 +102,48 @@ async function renderWith(
 ): Promise<{ pdf: Uint8Array; warnings: string[] }> {
   const merged = mergeResume(base.data, {} as Overrides);
   const ctx = buildCoverLetterContext(merged.profile, company, coverLetter);
-  return renderCoverLetterToPdf(template, JSON.stringify(ctx));
+  return renderCoverLetterToPdf(template, JSON.stringify(ctx), resolveLetterSource(coverLetter));
 }
 
-/** Today's date as a pre-formatted "Month D, YYYY" string (Typst can't parse dates). */
-function today(): string {
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric" }).format(
-    new Date(),
-  );
+/**
+ * The letter-design source picked by the effective letter's `template` field,
+ * or undefined to use the resume template's own letter. Unknown ids 404 — the
+ * id was validated on save, so this only fires when a design was removed (or
+ * on previews of unsaved diffs).
+ */
+function resolveLetterSource(coverLetter: CoverLetter): string | undefined {
+  if (!coverLetter.template) return undefined;
+  const letter = templateRegistry.getLetterTemplate(coverLetter.template);
+  if (!letter) {
+    throw notFound(
+      `Cover-letter template '${coverLetter.template}' not found`,
+      "cover_letter_template_not_found",
+      "template",
+    );
+  }
+  return letter.source;
+}
+
+/** 422 when a letter picks a design id that is not in the registry catalog. */
+function assertKnownLetterTemplate(coverLetter: CoverLetter): void {
+  if (coverLetter.template && !templateRegistry.hasLetterTemplate(coverLetter.template)) {
+    throw unprocessable(`Cover-letter template '${coverLetter.template}' not found`, [
+      {
+        field: "template",
+        received: coverLetter.template,
+        expected: templateRegistry.letterTemplateSummaries().map((t) => t.id).join(" | "),
+      },
+    ]);
+  }
+}
+
+/** Today's date as a pre-formatted long-date string (Typst can't parse dates). */
+function today(lang: "en" | "de"): string {
+  return new Intl.DateTimeFormat(lang === "de" ? "de-DE" : "en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(new Date());
 }
 
 /** Build a {value, href} contact from a link, prefixing https:// when bare. */
@@ -129,7 +164,8 @@ interface MergedProfile {
 /**
  * Compose the cover-letter render context: author identity from the resume
  * profile, recipient + body from the cover letter. addressee.institution falls
- * back to the resume's company; date falls back to today.
+ * back to the resume's company; date falls back to today in the letter's
+ * language (lang also picks the template's fallback strings).
  */
 export function buildCoverLetterContext(
   profile: MergedProfile,
@@ -148,11 +184,16 @@ export function buildCoverLetterContext(
     if (!["github", "linkedin", "portfolio"].includes(key) && value) contacts.push(linkContact(value));
   }
 
+  const lang = coverLetter.lang ?? "en";
   const addressee = coverLetter.addressee ?? {};
   return {
     author: profile.name ?? "",
     location: profile.location ?? "",
-    date: coverLetter.date ?? today(),
+    // Phone is separate from contacts so existing templates render unchanged;
+    // the DIN 5008 letter places it in the sender block.
+    phone: profile.phone ?? "",
+    date: coverLetter.date ?? today(lang),
+    lang,
     contacts,
     addressee: {
       ...addressee,
@@ -180,6 +221,7 @@ export function getBaseCoverLetter(baseId: string): CoverLetter | null {
 export function setBaseCoverLetter(baseId: string, rawBody: unknown): CoverLetter {
   requireBase(baseId);
   const coverLetter = parseOrThrow(coverLetterInputSchema, rawBody ?? {});
+  assertKnownLetterTemplate(coverLetter);
   const updated = baseRepo.update(baseId, { coverLetter });
   log.info("Base cover letter saved", { baseId });
   return updated!.coverLetter as CoverLetter;

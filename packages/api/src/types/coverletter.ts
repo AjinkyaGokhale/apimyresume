@@ -25,10 +25,14 @@ export type Addressee = z.infer<typeof addresseePartialSchema>;
 
 /** The letter content. All optional, NO defaults — defaults live in the template. */
 export const coverLetterBodyPartialSchema = z.object({
+  /** Bold subject line (DIN 5008: rendered without a "Subject:" prefix). */
+  subject: z.string().optional(),
   intro: z.string().optional(),
   paragraphs: z.array(z.string()).optional(),
   closing: z.string().optional(),
   signoff: z.string().optional(),
+  /** Enclosure list rendered after the signature (DIN 5008 "Anlagen"). */
+  enclosures: z.array(z.string()).optional(),
 });
 export type CoverLetterBody = z.infer<typeof coverLetterBodyPartialSchema>;
 
@@ -42,5 +46,12 @@ export const coverLetterInputSchema = z.object({
   body: coverLetterBodyPartialSchema.optional(),
   /** Optional pre-formatted date string (e.g. "June 16, 2026"). Defaults to today. */
   date: z.string().optional(),
+  /** Letter language: template fallback strings + default date locale. */
+  lang: z.enum(["en", "de"]).optional(),
+  /**
+   * Letter-design id (any template dir shipping a cover-letter.typ). Absent =
+   * the resume template's own letter, falling back to the shared default.
+   */
+  template: z.string().optional(),
 });
 export type CoverLetter = z.infer<typeof coverLetterInputSchema>;
