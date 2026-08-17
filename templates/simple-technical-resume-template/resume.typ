@@ -34,9 +34,9 @@
 
 #set page(
   paper: "a4",
-  // Wider side margins than the upstream 0.4in for more breathing room around
-  // the text; top/bottom stay tight so the page still fits densely.
-  margin: (top: 0.3in, bottom: 0.3in, left: 0.6in, right: 0.6in),
+  // Slightly wider side margins than the upstream 0.4in for a little breathing
+  // room around the text; top/bottom stay tight so the page still fits densely.
+  margin: (top: 0.3in, bottom: 0.3in, left: 0.5in, right: 0.5in),
 )
 
 #show link: underline
@@ -84,6 +84,21 @@
   if url == "" { body } else { link(href(url))[#body] }
 }
 
+// A small "opens elsewhere" mark: a square frame with an arrow escaping its
+// top-right corner. Drawn from primitives so the template needs no icon font
+// (none is shipped) and the mark scales with the surrounding text size.
+#let link-icon(size: 0.62em, thickness: 0.5pt, color: rgb("#333333")) = {
+  let s = size
+  let sk = thickness + color
+  box(baseline: 0.04em, width: s, height: s, {
+    place(dx: 0pt, dy: 0.34 * s, rect(width: 0.66 * s, height: 0.66 * s, stroke: sk))
+    // Shaft out of the frame, then the two barbs that form the arrow head.
+    place(line(start: (0.42 * s, 0.58 * s), end: (0.96 * s, 0.04 * s), stroke: sk))
+    place(line(start: (0.60 * s, 0.04 * s), end: (0.96 * s, 0.04 * s), stroke: sk))
+    place(line(start: (0.96 * s, 0.04 * s), end: (0.96 * s, 0.40 * s), stroke: sk))
+  })
+}
+
 // Two rows × two columns: left column left-aligned, right column right-aligned.
 #let two-by-two(cols, r1c1, r1c2, r2c1, r2c2) = {
   grid(
@@ -122,7 +137,13 @@
 }
 
 #let project-entry(name, url, role, period) = {
-  let nm = linked(strong(name), url)
+  // The name links to the project and the mark after it repeats the link, so the
+  // entry reads as clickable without an underline: the local rule cancels the
+  // global `show link: underline` for both, matching the certifications list.
+  let nm = {
+    show underline: it => it.body
+    [#linked(strong(name), url)#if url != "" [#h(0.3em)#linked(link-icon(), url)]]
+  }
   // Name (left) and period (right) on the first line; the role drops to its own
   // line below so a long project/thesis title doesn't collide with it.
   grid(columns: (1fr, auto), align(left)[#nm], align(right)[#period])
@@ -273,7 +294,9 @@
             - #md(b)
           ]
         ]
-        #v(3pt)
+        // Roles inside one company sit tighter than separate jobs do, so the
+        // progression reads as one block rather than several entries.
+        #v(-2pt)
       ]
     ] else [
       #work-entry(
@@ -311,6 +334,10 @@
 
 #let render-skills() = [
   = #ctx.skills.label
+  // The categories are `\`-separated lines of one paragraph, so leading is what
+  // sets the gap between them — a touch more than the document default so the
+  // list breathes without turning into separate blocks.
+  #set par(leading: 0.8em)
   #for cat in ctx.skills.data [
     *#cat.at("category", default: "")*: #cat.at("items", default: ()).join(", ") \
   ]
@@ -318,17 +345,23 @@
 
 #let render-certifications() = [
   = #ctx.certifications.label
+  // Certifications read as a bulleted list. The name still carries the credential
+  // link, so a long verification URL never takes up space on the page, but the
+  // global `#show link: underline` is cancelled here so the list stays quiet.
+  #show underline: it => it.body
   #for c in ctx.certifications.data [
-    #grid(
-      columns: (1fr, auto),
-      // The name itself carries the credential link, so a long verification URL
-      // never takes up space on the page (`#show link: underline` above keeps it
-      // visibly clickable).
-      align(left)[#linked(strong(c.at("name", default: "")), c.at("url", default: ""))#if c.at("issuer", default: "") != "" [, #c.issuer]],
-      align(right)[#c.at("year", default: "")],
-    )
-    #v(2pt)
+    - #grid(
+        columns: (1fr, auto),
+        align(left)[
+          #let url = c.at("url", default: "")
+          #linked(strong(c.at("name", default: "")), url)#if c.at("issuer", default: "") != "" [, #c.issuer]#if url != "" [#h(0.3em)#linked(link-icon(), url)]
+        ],
+        align(right)[#c.at("year", default: "")],
+      )
   ]
+  // The list carries no per-item trailing space, so close the section with a
+  // little air before whatever section follows.
+  #v(4pt)
 ]
 
 #let render-awards() = [
