@@ -67,3 +67,27 @@ jobs:
           # as untagged digests in GHCR and clutter the package versions list.
           provenance: false
           sbom: false
+
+  # Prune the untagged manifests each publish leaves behind, so the package's
+  # version list doesn't grow without bound between the weekly ghcr-cleanup run.
+  # Uses the same multi-arch-aware action as ghcr-cleanup.yml: this image is a
+  # manifest list (linux/amd64 + linux/arm64), so its per-platform sub-manifests
+  # are themselves untagged versions. A cleanup that merely deletes "untagged"
+  # versions would delete those and break `latest`; `delete-partial-images`
+  # keeps the children of every tag that is kept.
+  cleanup:
+    name: Prune untagged image versions
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Delete untagged image versions
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          packages: apimyresume
+          delete-untagged: true
+          delete-partial-images: true
+          keep-n-tagged: 10
