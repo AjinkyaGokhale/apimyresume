@@ -4,7 +4,7 @@ import {
   certificationSchema,
   customSectionSchema,
   educationSchema,
-  experienceSchema,
+  experienceListSchema,
   extracurricularSchema,
   languageSchema,
   projectSchema,
@@ -18,7 +18,10 @@ import {
  */
 
 export const injectBulletsSchema = z.object({
-  /** e.g. "experience.nineti" — targets an experience entry by its stable id. */
+  /**
+   * e.g. "experience.acme" — targets an experience entry by its stable id,
+   * or a single role inside a progression entry by that role's id.
+   */
   target: z.string(),
   mode: z.enum(["append", "prepend", "replace"]).default("append"),
   bullets: z.array(z.string()).default([]),
@@ -33,7 +36,7 @@ export type InjectBullets = z.infer<typeof injectBulletsSchema>;
 // likewise non-tailorable (profile is inherited verbatim in mergeResume;
 // template is forced to the base's in resolveTemplate).
 export const overridesSchema = z.object({
-  experience: z.array(experienceSchema).optional(),
+  experience: experienceListSchema.optional(),
   education: z.array(educationSchema).optional(),
   skills: z.array(skillSchema).optional(),
   projects: z.array(projectSchema).optional(),

@@ -34,7 +34,9 @@
 
 #set page(
   paper: "a4",
-  margin: (top: 0.3in, bottom: 0.3in, left: 0.4in, right: 0.4in),
+  // Wider side margins than the upstream 0.4in for more breathing room around
+  // the text; top/bottom stay tight so the page still fits densely.
+  margin: (top: 0.3in, bottom: 0.3in, left: 0.6in, right: 0.6in),
 )
 
 #show link: underline
@@ -63,6 +65,25 @@
   }
 }
 
+// Normalise a URL for linking. Both forms are accepted everywhere a link is
+// rendered — a bare host ("resume.agok.dev/resume/abc") or a complete URL
+// ("https://resume.agok.dev/resume/abc") — so a scheme the author already typed
+// is never prefixed twice.
+#let href(url) = if url.starts-with("http") { url } else { "https://" + url }
+
+// Strip the scheme for display so "https://x.dev/a" and "x.dev/a" read the same
+// on the page; the link target itself always keeps the full URL.
+#let display-url(url) = {
+  if url.starts-with("https://") { url.slice(8) }
+  else if url.starts-with("http://") { url.slice(7) }
+  else { url }
+}
+
+// Wrap `body` in a link to `url` when there is one; return it untouched otherwise.
+#let linked(body, url) = {
+  if url == "" { body } else { link(href(url))[#body] }
+}
+
 // Two rows × two columns: left column left-aligned, right column right-aligned.
 #let two-by-two(cols, r1c1, r1c2, r2c1, r2c2) = {
   grid(
@@ -72,8 +93,26 @@
   )
 }
 
+// One row, two columns: left column left-aligned, right column right-aligned.
+#let one-by-two(l, r) = {
+  grid(columns: (1fr, auto), align(left)[#l], align(right)[#r])
+}
+
 #let work-entry(title, company, location, period) = {
   two-by-two((1fr, auto), strong(title), strong(period), company, emph(location))
+  v(-0.3em)
+}
+
+// A progression at one company (`roles`): the company anchors the block with
+// its location opposite, and each role hangs beneath it carrying its own period
+// and bullets. The company is named once, so a promotion reads as one job.
+#let company-entry(company, location) = {
+  one-by-two(strong(company), emph(location))
+  v(-0.3em)
+}
+
+#let role-entry(role, period) = {
+  one-by-two(strong(role), strong(period))
   v(-0.3em)
 }
 
@@ -83,7 +122,7 @@
 }
 
 #let project-entry(name, url, role, period) = {
-  let nm = if url != "" { link("https://" + url)[#strong(name)] } else { strong(name) }
+  let nm = linked(strong(name), url)
   // Name (left) and period (right) on the first line; the role drops to its own
   // line below so a long project/thesis title doesn't collide with it.
   grid(columns: (1fr, auto), align(left)[#nm], align(right)[#period])
@@ -102,7 +141,10 @@
 
 #let contact-item(value, link-type: "") = {
   if value != "" {
-    if link-type != "" {
+    if link-type == "https://" {
+      // Web links go through href so a value typed with its scheme still works.
+      link(href(value))[#display-url(value)]
+    } else if link-type != "" {
       link(link-type + value)[#value]
     } else {
       value
@@ -143,7 +185,7 @@
   ]
   #if url != "" [
     // Render the complete URL verbatim and make it clickable.
-    #link(if url.starts-with("http") { url } else { "https://" + url })[#url] #linebreak()
+    #link(href(url))[#url] #linebreak()
   ]
   #for b in bls [
     - #md(b)
@@ -219,16 +261,32 @@
 #let render-experience() = [
   = #ctx.experience.label
   #for job in ctx.experience.data [
-    #work-entry(
-      job.at("role", default: ""),
-      job.at("company", default: ""),
-      job.at("location", default: ""),
-      job.at("period", default: ""),
-    )
-    #for b in job.at("bullets", default: ()) [
-      - #md(b)
+    #let roles = job.at("roles", default: ())
+    #if roles.len() > 0 [
+      // Progression entry: the company header owns the block; the entry's own
+      // role/period/bullets are not rendered because the roles carry them.
+      #company-entry(job.at("company", default: ""), job.at("location", default: ""))
+      #for r in roles [
+        #pad(left: 0.6em)[
+          #role-entry(r.at("role", default: ""), r.at("period", default: ""))
+          #for b in r.at("bullets", default: ()) [
+            - #md(b)
+          ]
+        ]
+        #v(3pt)
+      ]
+    ] else [
+      #work-entry(
+        job.at("role", default: ""),
+        job.at("company", default: ""),
+        job.at("location", default: ""),
+        job.at("period", default: ""),
+      )
+      #for b in job.at("bullets", default: ()) [
+        - #md(b)
+      ]
+      #v(3pt)
     ]
-    #v(3pt)
   ]
 ]
 
@@ -263,7 +321,10 @@
   #for c in ctx.certifications.data [
     #grid(
       columns: (1fr, auto),
-      align(left)[*#c.at("name", default: "")*#if c.at("issuer", default: "") != "" [, #c.issuer]],
+      // The name itself carries the credential link, so a long verification URL
+      // never takes up space on the page (`#show link: underline` above keeps it
+      // visibly clickable).
+      align(left)[#linked(strong(c.at("name", default: "")), c.at("url", default: ""))#if c.at("issuer", default: "") != "" [, #c.issuer]],
       align(right)[#c.at("year", default: "")],
     )
     #v(2pt)

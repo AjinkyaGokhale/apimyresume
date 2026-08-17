@@ -31,6 +31,25 @@
   }
 }
 
+// Normalise a URL for linking. Both forms are accepted everywhere a link is
+// rendered — a bare host ("resume.agok.dev/resume/abc") or a complete URL
+// ("https://resume.agok.dev/resume/abc") — so a scheme the author already typed
+// is never prefixed twice.
+#let href(url) = if url.starts-with("http") { url } else { "https://" + url }
+
+// Strip the scheme for display so "https://x.dev/a" and "x.dev/a" read the same
+// on the page; the link target itself always keeps the full URL.
+#let display-url(url) = {
+  if url.starts-with("https://") { url.slice(8) }
+  else if url.starts-with("http://") { url.slice(7) }
+  else { url }
+}
+
+// Wrap `body` in a link to `url` when there is one; return it untouched otherwise.
+#let linked(body, url) = {
+  if url == "" { body } else { link(href(url))[#body] }
+}
+
 // Date helper function
 #let dates-helper(start-date: "", end-date: "") = {
   if start-date == "" {
@@ -106,6 +125,22 @@
   )
 }
 
+// Progression at one company: the company anchors the block with its location
+// opposite, and each role hangs beneath carrying its own dates and bullets.
+#let work-company(
+  company: "",
+  location: "",
+) = {
+  generic-one-by-two(left: strong(company), right: emph(location))
+}
+
+#let work-role(
+  title: "",
+  dates: "",
+) = {
+  generic-one-by-two(left: strong(title), right: dates)
+}
+
 // Project component
 #let project(
   role: "",
@@ -116,14 +151,14 @@
   generic-one-by-two(
     left: {
       if role == "" {
-        [*#name* #if url != "" and dates != "" [ (#link("https://" + url)[#url])]]
+        [*#name* #if url != "" and dates != "" [ (#link(href(url))[#url])]]
       } else {
-        [*#role*, #name #if url != "" and dates != "" [ (#link("https://" + url)[#url])]]
+        [*#role*, #name #if url != "" and dates != "" [ (#link(href(url))[#url])]]
       }
     },
     right: {
       if dates == "" and url != "" {
-        link("https://" + url)[#url]
+        link(href(url))[#url]
       } else {
         dates
       }
@@ -139,10 +174,9 @@
   date: "",
 ) = {
   [
-    *#name*, #issuer
-    #if url != "" {
-      [ (#link("https://" + url)[#url])]
-    }
+    // The name itself carries the credential link, so a long verification URL
+    // never takes up space on the page.
+    #linked(strong(name), url)#if issuer != "" [, #issuer]
     #h(1fr) #date
   ]
 }
@@ -200,7 +234,10 @@
 // Personal Info Helper
 #let contact-item(value, prefix: "", link-type: "") = {
   if value != "" {
-    if link-type != "" {
+    if link-type == "https://" {
+      // Web links go through href so a value typed with its scheme still works.
+      link(href(value))[#(prefix + display-url(value))]
+    } else if link-type != "" {
       link(link-type + value)[#(prefix + value)]
     } else {
       value
@@ -241,7 +278,7 @@
     #if title != "" [*#title*#if sub != "" [ — #emph(sub)]] else if sub != "" [#emph(sub)]#if period != "" [#h(1fr) #period]#linebreak()
   ]
   #if url != "" [
-    #link(if url.starts-with("http") { url } else { "https://" + url })[#url] #linebreak()
+    #link(href(url))[#url] #linebreak()
   ]
   #for b in bls [
     - #md(b)
@@ -302,16 +339,38 @@
 #let render-experience() = [
   = Work Experience
   #for job in ctx.experience.data [
-    #work(
-      title: job.at("role", default: ""),
-      location: job.at("location", default: ""),
-      company: job.at("company", default: ""),
-      dates: dates-helper(start-date: "", end-date: job.at("period", default: "")),
-    )
-    #for b in job.at("bullets", default: ()) [
-      - #md(b)
+    #let roles = job.at("roles", default: ())
+    #if roles.len() > 0 [
+      // Progression entry: the roles carry the dates and bullets, so the
+      // entry's own role/period/bullets are not rendered.
+      #work-company(
+        company: job.at("company", default: ""),
+        location: job.at("location", default: ""),
+      )
+      #for r in roles [
+        #pad(left: 0.8em)[
+          #work-role(
+            title: r.at("role", default: ""),
+            dates: dates-helper(start-date: "", end-date: r.at("period", default: "")),
+          )
+          #for b in r.at("bullets", default: ()) [
+            - #md(b)
+          ]
+        ]
+        #v(3pt)
+      ]
+    ] else [
+      #work(
+        title: job.at("role", default: ""),
+        location: job.at("location", default: ""),
+        company: job.at("company", default: ""),
+        dates: dates-helper(start-date: "", end-date: job.at("period", default: "")),
+      )
+      #for b in job.at("bullets", default: ()) [
+        - #md(b)
+      ]
+      #v(3pt)
     ]
-    #v(3pt)
   ]
 ]
 
@@ -359,7 +418,8 @@
       name: cert.at("name", default: ""),
       issuer: cert.at("issuer", default: ""),
       url: cert.at("url", default: ""),
-      date: cert.at("date", default: ""),
+      // The KB field is `year` — reading `date` here meant the year never rendered.
+      date: str(cert.at("year", default: "")),
     )
     #v(3pt)
   ]

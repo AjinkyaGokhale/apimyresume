@@ -42,11 +42,28 @@
   ]
 }
 
+// Normalise a URL for linking. Both forms are accepted everywhere a link is
+// rendered — a bare host ("resume.agok.dev/resume/abc") or a complete URL
+// ("https://resume.agok.dev/resume/abc") — so a scheme the author already typed
+// is never prefixed twice.
+#let href(url) = if url.starts-with("http") { url } else { "https://" + url }
+
+// Strip the scheme for display so "https://x.dev/a" and "x.dev/a" read the same
+// on the page; the link target itself always keeps the full URL.
+#let display-url(url) = {
+  if url.starts-with("https://") { url.slice(8) }
+  else if url.starts-with("http://") { url.slice(7) }
+  else { url }
+}
+
 // A contact entry; returns `none` when the underlying value is empty so the
 // header line only joins the items that actually exist.
 #let contact-item(value, prefix: "", link-type: "") = {
   if value != "" {
-    if link-type != "" {
+    if link-type == "https://" {
+      // Web links go through href so a value typed with its scheme still works.
+      link(href(value))[#(prefix + display-url(value))]
+    } else if link-type != "" {
       link(link-type + value)[#(prefix + value)]
     } else {
       value
@@ -65,6 +82,11 @@
   for (i, part) in parts.enumerate() {
     if calc.rem(i, 2) == 1 { strong(part) } else { part }
   }
+}
+
+// Wrap `body` in a link to `url` when there is one; return it untouched otherwise.
+#let linked(body, url) = {
+  if url == "" { body } else { link(href(url))[#body] }
 }
 
 // ===== Entry components =====
@@ -92,6 +114,30 @@
   ])
 }
 
+// Progression at one company: the company anchors the block with its location
+// opposite, and each role hangs beneath carrying its own date and bullets.
+#let exp_group(name: "", location: "", roles: ()) = {
+  set block(above: 0.7em, below: 1em)
+  pad(left: 1em, right: 0.5em, box[
+    #grid(
+      columns: (3fr, 1fr),
+      align(left)[*#name*],
+      align(right)[_#location _],
+    )
+    #for r in roles [
+      #pad(left: 0.8em, top: 0.35em)[
+        #grid(
+          columns: (3fr, 1fr),
+          align(left)[*#r.at("role", default: "")*],
+          align(right)[#r.at("period", default: "")],
+        )
+        #let bls = r.at("bullets", default: ())
+        #if bls.len() > 0 [#list(..bls.map(md))]
+      ]
+    ]
+  ])
+}
+
 #let project_item(name: "", skills: "", date: "", desc: "", bullets: ()) = {
   set block(above: 0.7em, below: 1em)
   pad(left: 1em, right: 0.5em, box[
@@ -112,7 +158,9 @@
 #let cert_item(name: "", issuer: "", url: "", date: "") = {
   set block(above: 0.5em)
   pad(left: 1em, right: 0.5em, block[
-    *#name*#if issuer != "" [, #issuer]#if url != "" [ (#link("https://" + url)[#url])] #h(1fr) #date
+    // The name itself carries the credential link, so a long verification URL
+    // never takes up space on the page.
+    #linked(strong(name), url)#if issuer != "" [, #issuer] #h(1fr) #date
   ])
 }
 
@@ -136,7 +184,7 @@
     }
   }
   if url != "" {
-    [#link(if url.starts-with("http") { url } else { "https://" + url })[#url]\ ]
+    [#link(href(url))[#url]\ ]
   }
   if bls.len() > 0 {
     pad(left: 1em, right: 0.5em, list(..bls.map(md)))
@@ -213,13 +261,24 @@
 #let render-experience() = {
   resume_heading("Experience")
   for job in ctx.experience.data {
-    exp_item(
-      role: job.at("role", default: ""),
-      name: job.at("company", default: ""),
-      location: job.at("location", default: ""),
-      date: job.at("period", default: ""),
-      bullets: job.at("bullets", default: ()),
-    )
+    let roles = job.at("roles", default: ())
+    if roles.len() > 0 {
+      // Progression entry: the roles carry the dates and bullets, so the
+      // entry's own role/period/bullets are not rendered.
+      exp_group(
+        name: job.at("company", default: ""),
+        location: job.at("location", default: ""),
+        roles: roles,
+      )
+    } else {
+      exp_item(
+        role: job.at("role", default: ""),
+        name: job.at("company", default: ""),
+        location: job.at("location", default: ""),
+        date: job.at("period", default: ""),
+        bullets: job.at("bullets", default: ()),
+      )
+    }
   }
 }
 

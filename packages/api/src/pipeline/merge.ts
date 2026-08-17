@@ -1,4 +1,4 @@
-import type { KB } from "../types/kb.ts";
+import { findBulletTarget, type KB } from "../types/kb.ts";
 import type { InjectBullets, Overrides } from "../types/overrides.ts";
 import type { MergedDoc } from "../mapper/index.ts";
 import { log } from "../lib/log.ts";
@@ -41,6 +41,8 @@ export function deepMerge<T>(base: T, override: unknown): T {
 /**
  * Apply an inject_bullets directive to the merged experience array. Targets are
  * resolved by stable id ("experience.<id>"), robust to array reordering (§7).
+ * The id names a flat entry or a single role inside a progression entry; a
+ * progression entry's own id owns no bullets and is reported as not found.
  */
 function applyInjectBullets(merged: MergedDoc, directives: InjectBullets[]): void {
   for (const d of directives) {
@@ -49,22 +51,22 @@ function applyInjectBullets(merged: MergedDoc, directives: InjectBullets[]): voi
       log.warn("inject_bullets: unsupported target, skipping", { target: d.target });
       continue;
     }
-    const entry = merged.experience.find((e) => e.id === targetId);
-    if (!entry) {
+    const owner = findBulletTarget(merged.experience, targetId);
+    if (!owner) {
       log.warn("inject_bullets: target not found, skipping", { target: d.target });
       continue;
     }
-    const existing = entry.bullets ?? [];
+    const existing = owner.bullets ?? [];
     switch (d.mode) {
       case "prepend":
-        entry.bullets = [...d.bullets, ...existing];
+        owner.bullets = [...d.bullets, ...existing];
         break;
       case "replace":
-        entry.bullets = [...d.bullets];
+        owner.bullets = [...d.bullets];
         break;
       case "append":
       default:
-        entry.bullets = [...existing, ...d.bullets];
+        owner.bullets = [...existing, ...d.bullets];
         break;
     }
   }

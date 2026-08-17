@@ -52,10 +52,27 @@
   #block(text(weight: 700, 2.5em, [#smallcaps(name)]))
 ]
 
+// Normalise a URL for linking. Both forms are accepted everywhere a link is
+// rendered — a bare host ("resume.agok.dev/resume/abc") or a complete URL
+// ("https://resume.agok.dev/resume/abc") — so a scheme the author already typed
+// is never prefixed twice.
+#let href(url) = if url.starts-with("http") { url } else { "https://" + url }
+
+// Strip the scheme for display so "https://x.dev/a" and "x.dev/a" read the same
+// on the page; the link target itself always keeps the full URL.
+#let display-url(url) = {
+  if url.starts-with("https://") { url.slice(8) }
+  else if url.starts-with("http://") { url.slice(7) }
+  else { url }
+}
+
 // Contact line.
 #let contact-item(value, prefix: "") = {
   if value != "" {
-    if prefix != "" {
+    if prefix == "https://" {
+      // Web links go through href so a value typed with its scheme still works.
+      link(href(value))[#display-url(value)]
+    } else if prefix != "" {
       link(prefix + value)[#value]
     } else {
       value
@@ -97,6 +114,11 @@
   }
 }
 
+// Wrap `body` in a link to `url` when there is one; return it untouched otherwise.
+#let linked(body, url) = {
+  if url == "" { body } else { link(href(url))[#body] }
+}
+
 // Title on the left (bold + emph subtitle), date/location on the right.
 #let entry(title: "", subtitle: "", date: "", location: "") = {
   pad(
@@ -130,7 +152,7 @@
     #if title != "" [*#title*#if sub != "" [ — #emph(sub)]] else if sub != "" [#emph(sub)]#if period != "" [#h(1fr) #period]#linebreak()
   ]
   #if url != "" [
-    #link(if url.starts-with("http") { url } else { "https://" + url })[#url] #linebreak()
+    #link(href(url))[#url] #linebreak()
   ]
   #bullets(bls)
 ]
@@ -191,14 +213,35 @@
 #let render-experience() = [
   = Experience
   #for job in ctx.experience.data [
-    #entry(
-      title: job.at("role", default: ""),
-      subtitle: job.at("company", default: ""),
-      date: job.at("period", default: ""),
-      location: job.at("location", default: ""),
-    )
-    #bullets(job.at("bullets", default: ()))
-    #v(3pt)
+    #let roles = job.at("roles", default: ())
+    #if roles.len() > 0 [
+      // Progression at one company: the company anchors the block (location
+      // opposite it) and each role hangs beneath with its own period and
+      // bullets. The entry's own role/period/bullets are not rendered.
+      #entry(
+        title: job.at("company", default: ""),
+        date: job.at("location", default: ""),
+      )
+      #for r in roles [
+        #pad(left: 0.8em)[
+          #entry(
+            title: r.at("role", default: ""),
+            date: r.at("period", default: ""),
+          )
+          #bullets(r.at("bullets", default: ()))
+        ]
+        #v(3pt)
+      ]
+    ] else [
+      #entry(
+        title: job.at("role", default: ""),
+        subtitle: job.at("company", default: ""),
+        date: job.at("period", default: ""),
+        location: job.at("location", default: ""),
+      )
+      #bullets(job.at("bullets", default: ()))
+      #v(3pt)
+    ]
   ]
 ]
 
@@ -209,7 +252,7 @@
     #entry(
       title: {
         let n = p.at("name", default: "")
-        if url != "" { link("https://" + url)[#n] } else { n }
+        linked(n, url)
       },
       subtitle: p.at("role", default: ""),
       date: p.at("period", default: ""),
@@ -236,13 +279,13 @@
 #let render-certifications() = [
   = Certifications
   #for cert in ctx.certifications.data [
-    #let url = cert.at("url", default: "")
+    // The name itself carries the credential link, so a long verification URL
+    // never takes up space on the page.
     #entry(
-      title: cert.at("name", default: ""),
+      title: linked(cert.at("name", default: ""), cert.at("url", default: "")),
       subtitle: cert.at("issuer", default: ""),
       date: str(cert.at("year", default: "")),
     )
-    #if url != "" [ #link("https://" + url)[#url] \ ]
     #v(3pt)
   ]
 ]

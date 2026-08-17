@@ -129,6 +129,68 @@ describe("merge engine (spec §7)", () => {
   });
 });
 
+describe("inject_bullets targeting a progression entry", () => {
+  // One company, two roles — each role owns its own bullets and its own id.
+  const progressionBase: KB = {
+    ...base,
+    experience: [
+      {
+        id: "globex",
+        company: "Globex GmbH",
+        location: "Berlin, Germany",
+        bullets: [],
+        roles: [
+          { id: "globex-senior", role: "Senior Engineer", period: "2024 – present", bullets: ["Owned two IoT products"] },
+          { id: "globex-intern", role: "Intern", period: "2023 – 2024", bullets: ["Built the ingestion pipeline"] },
+        ],
+      },
+      base.experience[1]!,
+    ],
+  };
+  const rolesOf = (kb: ReturnType<typeof mergeResume>) =>
+    kb.experience.find((e) => e.id === "globex")!.roles!;
+
+  test("a role id resolves to that role's bullets only", () => {
+    const merged = mergeResume(progressionBase, overridesSchema.parse({
+      inject_bullets: [{ target: "experience.globex-intern", mode: "append", bullets: ["Added MQTT reconnect"] }],
+    }));
+    expect(rolesOf(merged)[1]!.bullets).toEqual(["Built the ingestion pipeline", "Added MQTT reconnect"]);
+    // The sibling role is untouched.
+    expect(rolesOf(merged)[0]!.bullets).toEqual(["Owned two IoT products"]);
+  });
+
+  test("replace substitutes one role's bullets without touching the others", () => {
+    const merged = mergeResume(progressionBase, overridesSchema.parse({
+      inject_bullets: [{ target: "experience.globex-senior", mode: "replace", bullets: ["ONLY"] }],
+    }));
+    expect(rolesOf(merged)[0]!.bullets).toEqual(["ONLY"]);
+    expect(rolesOf(merged)[1]!.bullets).toEqual(["Built the ingestion pipeline"]);
+  });
+
+  test("the company entry's own id is a no-op — the roles own the bullets", () => {
+    const merged = mergeResume(progressionBase, overridesSchema.parse({
+      inject_bullets: [{ target: "experience.globex", mode: "append", bullets: ["nowhere"] }],
+    }));
+    expect(rolesOf(merged).flatMap((r) => r.bullets)).not.toContain("nowhere");
+    expect(merged.experience.find((e) => e.id === "globex")!.bullets).toEqual([]);
+  });
+
+  test("flat entries alongside a progression still resolve by their own id", () => {
+    const merged = mergeResume(progressionBase, overridesSchema.parse({
+      inject_bullets: [{ target: "experience.swapmails", mode: "append", bullets: ["y"] }],
+    }));
+    expect(merged.experience.find((e) => e.id === "swapmails")!.bullets).toEqual(["x", "y"]);
+  });
+
+  test("base is never mutated when a nested role is targeted", () => {
+    const before = structuredClone(progressionBase);
+    mergeResume(progressionBase, overridesSchema.parse({
+      inject_bullets: [{ target: "experience.globex-senior", mode: "replace", bullets: ["z"] }],
+    }));
+    expect(progressionBase).toEqual(before);
+  });
+});
+
 describe("section_order is base-owned, not child-overridable", () => {
   const orderedBase: KB = { ...base, section_order: ["skills", "experience", "education"] };
 

@@ -58,7 +58,12 @@ export function buildSchemaDocument() {
           // Replaceable content sections (each mirrors the base KB section).
           experience: {
             type: "array",
-            description: "Replace the experience list (rewrite bullets, reorder, trim) for this child.",
+            description:
+              "Replace the experience list (rewrite bullets, reorder, trim) for this child. " +
+              "An entry is either flat (`role` + `period` on the entry) or a progression at one " +
+              "company (a `roles` list, each role with its own id, role, period and bullets); " +
+              "when `roles` is present the entry's own role/period/bullets are not rendered. " +
+              "All entry and role ids must be unique.",
           },
           skills: {
             type: "array",
@@ -92,7 +97,9 @@ export function buildSchemaDocument() {
             type: "array",
             description:
               "Append/prepend/replace bullets on an experience entry by id — the surgical " +
-              "way to rewrite work-experience bullets without resending the whole section.",
+              "way to rewrite work-experience bullets without resending the whole section. " +
+              "For a progression entry, target the individual role's id; the company entry's " +
+              "own id owns no bullets and is ignored.",
             items: {
               type: "object",
               properties: {

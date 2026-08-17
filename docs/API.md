@@ -99,7 +99,7 @@ and **every create or update produces a new PDF version**.
 
 ```jsonc
 {
-  "target": "experience.<id>",   // the id of the experience entry to change
+  "target": "experience.<id>",   // the id of the experience entry (or role) to change
   "mode": "append",              // "append", "prepend", or "replace"
   "bullets": ["New bullet point here."]
 }
@@ -107,6 +107,45 @@ and **every create or update produces a new PDF version**.
 
 > `profile` (your name, contact, links) and `template` (the design) **cannot** be changed in a
 > child — they always come from the base. Any unknown keys you send are quietly ignored.
+
+### One company, several roles
+
+If you were promoted (or changed title) without changing employer, put the roles in a `roles`
+list on a single experience entry. The company is named once and the roles are shown nested
+beneath it, so the progression reads as one job rather than three unrelated ones:
+
+```yaml
+experience:
+  - id: acme
+    company: Acme Corp
+    location: Berlin, Germany
+    roles:
+      - id: acme-engineer
+        role: Software Engineer (Working Student, 20h/week)
+        period: Apr 2025 – Present
+        bullets:
+          - Built the **TypeScript** and **Node.js** ingestion backend on **AWS Lambda**.
+      - id: acme-intern
+        role: Software Engineering Intern (Full-time)
+        period: Oct 2024 – Mar 2025
+        bullets:
+          - Built a serverless IoT ingestion pipeline that ingests high frequency data.
+```
+
+Rules worth knowing:
+
+- An entry is either **flat** (`role` + `period` on the entry itself, as usual) or a
+  **progression** (a non-empty `roles` list). When `roles` is present it wins — the entry's own
+  `role`, `period` and `bullets` are not rendered.
+- Every role needs its own `id`, and **all ids must be unique** across entries and roles.
+- `id` is what bullet targeting uses. `"target": "experience.acme-intern"` rewrites just that
+  role's bullets; the company entry's own id (`experience.acme`) owns no bullets and is
+  ignored. The same is true of `PATCH /api/v1/bases/{id}/experience/{entryId}/bullets`.
+- `GET /api/v1/bases/{id}/content` lists **one item per role**, each with the id you target, so
+  an agent reading the base never has to know whether an entry is flat or a progression.
+
+All four resume templates render progressions in their own style, so this works whichever
+design you pick.
 
 ### Create a resume
 

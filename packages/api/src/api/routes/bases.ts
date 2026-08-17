@@ -22,6 +22,7 @@ import {
   setBaseCoverLetter,
 } from "../../services/coverletter.ts";
 import { baseThumbnail } from "../../services/resume.ts";
+import { experienceRoles } from "../../types/kb.ts";
 
 /** Base resume routes (spec §3). */
 export const bases = new Hono();
@@ -104,19 +105,26 @@ bases.get("/:id/content", (c) => {
         skills: [{ category: "string", items: ["string"] }],
         experience: [{ id: "string (required — preserve as-is)", company: "string", role: "string", period: "string", bullets: ["string"] }],
       },
+      experience_note:
+        "One item per role. Several items may share a company when that job was a progression — " +
+        "each still has its own `id`, and bullets are always targeted by that `id`.",
     },
     profile: {
       name: d.profile.name,
       title: d.profile.title,
       summary: d.profile.summary ?? null,
     },
-    experience: d.experience.map((e) => ({
-      id: e.id,
-      company: e.company,
-      role: e.role,
-      period: e.period,
-      bullets: e.bullets,
-    })),
+    // Flattened to one item per role: a progression entry contributes each of
+    // its roles separately, so every `id` the agent sees is a valid bullet target.
+    experience: d.experience.flatMap((e) =>
+      experienceRoles(e).map((r) => ({
+        id: r.id,
+        company: e.company,
+        role: r.role,
+        period: r.period,
+        bullets: r.bullets,
+      })),
+    ),
     skills: d.skills,
   });
 });

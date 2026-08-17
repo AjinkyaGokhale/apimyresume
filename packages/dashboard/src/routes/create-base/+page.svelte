@@ -132,16 +132,26 @@ education:
       - "Thesis: Scalable Distributed Key-Value Store with Consistent Hashing and Replication"
 
 experience:
-  - id: sap-intern
-    role: Software Engineering Intern
+  # Promoted without changing employer? List the roles under one company and the
+  # company is named once, with the roles nested beneath it. Every role needs its
+  # own id, and all ids must be unique across entries and roles.
+  - id: sap
     company: SAP SE
     location: Walldorf, Germany
-    period: Mar 2024 – Aug 2024
-    bullets:
-      - "Developed microservices handling 5M+ daily requests using Kubernetes and Go"
-      - "Reduced API latency by 35% through Redis caching and query optimization"
-      - "Implemented CI/CD pipelines reducing deployment time from hours to minutes"
-      - "Collaborated with team of 12 engineers in agile sprints, mentored 2 junior developers"
+    roles:
+      - id: sap-werkstudent
+        role: Software Engineer (Working Student)
+        period: Sep 2024 – Present
+        bullets:
+          - "Developed microservices handling 5M+ daily requests using Kubernetes and Go"
+          - "Reduced API latency by 35% through Redis caching and query optimization"
+      - id: sap-intern
+        role: Software Engineering Intern
+        period: Mar 2024 – Aug 2024
+        bullets:
+          - "Implemented CI/CD pipelines reducing deployment time from hours to minutes"
+          - "Collaborated with team of 12 engineers in agile sprints, mentored 2 junior developers"
+  # A single-role job stays flat: role and period sit on the entry itself.
   - id: fraunhofer-research
     role: Research Assistant
     company: Fraunhofer Institute for AI

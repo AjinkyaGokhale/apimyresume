@@ -1,7 +1,7 @@
 import { baseRepo, resumeRepo } from "../db/repo.ts";
 import { conflict, notFound } from "../lib/errors.ts";
 import { parseOrThrow } from "../lib/validation.ts";
-import { createBaseSchema, kbSchema, type KB } from "../types/kb.ts";
+import { createBaseSchema, findBulletTarget, kbSchema, type KB } from "../types/kb.ts";
 import { deleteResume, regenerateResume } from "./resume.ts";
 
 /**
@@ -45,17 +45,23 @@ export function listBases() {
 }
 
 /**
- * Replace the bullets of a single experience entry by its stable id.
- * All other experience entries and all other sections are left untouched.
+ * Replace the bullets of a single experience entry by its stable id. The id
+ * names a flat entry or one role inside a progression entry; either way only
+ * that one bullet list changes and every other entry and section is untouched.
  */
 export function updateExperienceBullets(baseId: string, entryId: string, bullets: string[]) {
   const existing = getBase(baseId);
-  const entry = existing.data.experience.find((e) => e.id === entryId);
-  if (!entry) throw notFound(`Experience entry '${entryId}' not found in base '${baseId}'`);
+  if (!findBulletTarget(existing.data.experience, entryId)) {
+    throw notFound(`Experience entry '${entryId}' not found in base '${baseId}'`);
+  }
 
-  const updatedExperience = existing.data.experience.map((e) =>
-    e.id === entryId ? { ...e, bullets } : e,
-  );
+  const updatedExperience = existing.data.experience.map((e) => {
+    if (e.roles?.length) {
+      if (!e.roles.some((r) => r.id === entryId)) return e;
+      return { ...e, roles: e.roles.map((r) => (r.id === entryId ? { ...r, bullets } : r)) };
+    }
+    return e.id === entryId ? { ...e, bullets } : e;
+  });
   const mergedData = { ...existing.data, experience: updatedExperience };
 
   return baseRepo.update(baseId, {
