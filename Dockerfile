@@ -15,11 +15,13 @@ WORKDIR /app
 COPY --from=ghcr.io/typst/typst:0.14.2 /bin/typst /usr/local/bin/typst
 
 # --- Fonts ---
-# apt: free/metric-compatible equivalents for common fonts
-# Montserrat downloaded separately (not in standard apt)
+# apt: free/metric-compatible equivalents for common fonts, Montserrat included.
+# Montserrat used to be wget'd from raw.githubusercontent.com, which broke the
+# build (wget exit 8) once GitHub started answering 429 Too Many Requests for
+# the shared CI runner IP. Debian ships it as fonts-montserrat, so the image no
+# longer depends on a third-party host at build time — and wget is not needed.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       wget \
        ca-certificates \
        fontconfig \
        fonts-dejavu-core \
@@ -28,12 +30,8 @@ RUN apt-get update \
        fonts-crosextra-caladea \
        fonts-ebgaramond \
        fonts-cabin \
-  && mkdir -p /usr/local/share/fonts/montserrat \
-  && wget -q \
-       "https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf" \
-       -O /usr/local/share/fonts/montserrat/Montserrat.ttf \
+       fonts-montserrat \
   && fc-cache -f \
-  && apt-get purge -y --auto-remove wget \
   && rm -rf /var/lib/apt/lists/*
 
 # --- API dependencies ---
