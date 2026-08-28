@@ -1,4 +1,4 @@
-FROM oven/bun:1.3 AS dashboard-builder
+FROM oven/bun:1.4 AS dashboard-builder
 WORKDIR /dashboard
 COPY packages/dashboard/package.json packages/dashboard/bun.lock* ./
 RUN bun install --frozen-lockfile
@@ -8,7 +8,7 @@ ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 RUN bun run build
 
-FROM oven/bun:1.3 AS base
+FROM oven/bun:1.4 AS base
 WORKDIR /app
 
 # --- Typst CLI binary ---
