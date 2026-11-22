@@ -126,12 +126,14 @@
   closing
 }
 
-// ===== Signoff + signature room =====
+// ===== Signoff =====
 // DIN 5008: no comma after the German Grußformel; English keeps its comma.
+// Letters are sent as PDFs and not signed by hand, so the name follows the
+// signoff directly instead of leaving room for a handwritten signature.
 #let signoff = body.at("signoff", default: if de { "Mit freundlichen Grüßen" } else { "Sincerely" })
 #v(1em)
 #if de [ #signoff ] else [ #signoff, ]
-#v(1.2cm)
+#v(0.3em)
 #author
 
 // ===== Enclosures (DIN "Anlagen") =====
