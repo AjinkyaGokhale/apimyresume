@@ -1,0 +1,9 @@
+{
+  "id": "simple-technical-resume-template",
+  "name": "Simple Technical Resume",
+  "description": "Dense, ATS-friendly single-column technical resume: a centered upper-case name, small-caps ruled section titles and compact two-column entries. Adapted from the open-source simple-technical-resume Typst template by Himank Dave (steadyfall).",
+  "engine": "typst",
+  "paperSize": "us-letter",
+  "fonts": ["New Computer Modern"],
+  "typstPackages": []
+}

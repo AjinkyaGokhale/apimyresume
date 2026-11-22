@@ -46,6 +46,17 @@ Open http://localhost:3000, create your base resume, and start generating tailor
 
 👉 Full instructions, custom domains, and HTTPS: **[Self-Hosting Guide](docs/SELF-HOSTING.md)**.
 
+### Or use it inside Claude (no server needed)
+
+The Claude Code plugin runs the whole engine locally, so Claude can build your base resume,
+tailor resumes and cover letters, and track your applications by itself:
+
+```
+/plugin install apimyresume --marketplace AjinkyaGokhale/apimyresume
+```
+
+👉 **[Claude plugin guide](docs/CLAUDE-PLUGIN.md)**.
+
 ## How it works
 
 1. You create **one base resume** — your full profile. This is your source of truth.
@@ -61,6 +72,8 @@ Your base resume never changes by accident — automation only ever edits the jo
   (perfect for AI agents, n8n, and Zapier).
 - 🚀 **[Self-Hosting Guide](docs/SELF-HOSTING.md)** — Docker, custom domain + HTTPS,
   configuration, security, and local development.
+- 🤖 **[Claude Plugin](docs/CLAUDE-PLUGIN.md)**: install, tools, skills, and how to build the
+  plugin from source.
 
 ## License
 

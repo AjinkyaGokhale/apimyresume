@@ -12,10 +12,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "build:plugin": "bun run scripts/build-plugin.ts"
   },
   "dependencies": {
     "@hono/zod-validator": "0.4.3",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@myriaddreamin/typst-ts-node-compiler": "0.7.0-rc2",
     "drizzle-orm": "0.45.2",
     "hono": "4.12.23",
