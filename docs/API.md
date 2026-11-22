@@ -139,6 +139,8 @@ Rules worth knowing:
   **progression** (a non-empty `roles` list). When `roles` is present it wins — the entry's own
   `role`, `period` and `bullets` are not rendered.
 - Every role needs its own `id`, and **all ids must be unique** across entries and roles.
+- A role, or a flat entry, can carry an optional `url` (for example a thesis repository). The
+  simple-technical template then renders its title as a clickable link with a small link mark.
 - `id` is what bullet targeting uses. `"target": "experience.acme-intern"` rewrites just that
   role's bullets; the company entry's own id (`experience.acme`) owns no bullets and is
   ignored. The same is true of `PATCH /api/v1/bases/{id}/experience/{entryId}/bullets`.

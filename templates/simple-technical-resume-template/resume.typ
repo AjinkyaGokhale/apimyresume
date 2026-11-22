@@ -113,8 +113,16 @@
   grid(columns: (1fr, auto), align(left)[#l], align(right)[#r])
 }
 
-#let work-entry(title, company, location, period) = {
-  two-by-two((1fr, auto), strong(title), strong(period), company, emph(location))
+// A bold title that links to `url` when there is one, followed by the same
+// "opens elsewhere" mark the projects and certifications use. The local rule
+// cancels the global link underline so the title reads like the others.
+#let linked-title(title, url) = {
+  show underline: it => it.body
+  [#linked(strong(title), url)#if url != "" [#h(0.3em)#linked(link-icon(), url)]]
+}
+
+#let work-entry(title, company, location, period, url: "") = {
+  two-by-two((1fr, auto), linked-title(title, url), strong(period), company, emph(location))
   v(-0.3em)
 }
 
@@ -126,8 +134,8 @@
   v(-0.3em)
 }
 
-#let role-entry(role, period) = {
-  one-by-two(strong(role), strong(period))
+#let role-entry(role, period, url: "") = {
+  one-by-two(linked-title(role, url), strong(period))
   v(-0.3em)
 }
 
@@ -289,7 +297,7 @@
       #company-entry(job.at("company", default: ""), job.at("location", default: ""))
       #for r in roles [
         #pad(left: 0.6em)[
-          #role-entry(r.at("role", default: ""), r.at("period", default: ""))
+          #role-entry(r.at("role", default: ""), r.at("period", default: ""), url: r.at("url", default: ""))
           #for b in r.at("bullets", default: ()) [
             - #md(b)
           ]
@@ -304,6 +312,7 @@
         job.at("company", default: ""),
         job.at("location", default: ""),
         job.at("period", default: ""),
+        url: job.at("url", default: ""),
       )
       #for b in job.at("bullets", default: ()) [
         - #md(b)
@@ -311,6 +320,9 @@
       #v(3pt)
     ]
   ]
+  // A progression's roles end with a negative gap, so close the section with
+  // a little air before the next heading, as the other sections do.
+  #v(6pt)
 ]
 
 #let render-projects() = [
