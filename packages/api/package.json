@@ -24,11 +24,11 @@
     "nanoid": "6.0.1",
     "p-queue": "9.3.3",
     "yaml": "2.9.0",
-    "zod": "4.4.3"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/bun": "1.4.0",
     "drizzle-kit": "0.31.10",
-    "typescript": "7.0.2"
+    "typescript": "5.9.3"
   }
 }
