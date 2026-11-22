@@ -15,6 +15,7 @@ const {
   clearTemplatesCache,
   ApiError,
   ApiUnreachable,
+  listJobs,
 } = await import("./api.ts");
 
 const realFetch = globalThis.fetch;
@@ -129,5 +130,20 @@ describe("getTemplates() session cache", () => {
     // Give the fire-and-forget prime time to exhaust its retries.
     await new Promise((r) => setTimeout(r, 600));
     expect(calls).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("listJobs query string", () => {
+  it("joins status lists and skips empty filters", async () => {
+    let url = "";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      url = String(input);
+      return jsonResponse({ data: [], pagination: { total: 0, page: 1, limit: 20, has_next: false } });
+    }) as typeof fetch;
+
+    await listJobs({ status: ["applied", "offer"], location: "", from: "2026-10-01", sort: "applied_at", order: "asc" });
+    expect(url).toBe(
+      "http://api.test/api/v1/jobs?status=applied%2Coffer&from=2026-10-01&sort=applied_at&order=asc",
+    );
   });
 });

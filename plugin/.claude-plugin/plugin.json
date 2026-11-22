@@ -1,0 +1,17 @@
+{
+  "name": "apimyresume",
+  "displayName": "APIMyResume",
+  "version": "1.4.0",
+  "description": "Build your base resume, tailor a polished PDF resume and cover letter for every job, and track your applications, all locally inside Claude.",
+  "author": { "name": "Ajinkya Gokhale" },
+  "homepage": "https://github.com/AjinkyaGokhale/apimyresume",
+  "repository": "https://github.com/AjinkyaGokhale/apimyresume",
+  "license": "MIT",
+  "keywords": ["resume", "cv", "cover-letter", "job-search", "job-tracker", "typst", "pdf"],
+  "mcpServers": {
+    "apimyresume": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/server.js"]
+    }
+  }
+}

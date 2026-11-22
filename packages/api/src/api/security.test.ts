@@ -216,3 +216,59 @@ describe("non-numeric pagination params are tolerated", () => {
     expect(pagination.limit).toBe(20);
   });
 });
+
+describe("job tracker: agents create/update, only the owner deletes", () => {
+  const json = (body: unknown, method = "POST"): RequestInit => ({
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const job = { company: "Acme", role: "Backend Engineer", job_url: "https://acme.test/jobs/1", location: "Berlin" };
+  let jobId: string;
+
+  test("GET /jobs without auth → 401", async () => {
+    expect(status(await noAuth("/jobs"))).toBe(401);
+  });
+
+  test("API key POST /jobs → 201, same job_url again → 200 with the same id", async () => {
+    const first = await withKey("/jobs", json(job));
+    expect(first.status).toBe(201);
+    jobId = ((await first.json()) as { id: string }).id;
+
+    const again = await withKey("/jobs", json({ ...job, notes: "re-posted" }));
+    expect(again.status).toBe(200);
+    const body = (await again.json()) as { id: string; notes: string };
+    expect(body.id).toBe(jobId);
+    expect(body.notes).toBe("re-posted");
+  });
+
+  test("PATCH status records history and stamps applied_at", async () => {
+    expect(status(await withKey(`/jobs/${jobId}`, json({ status: "applied" }, "PATCH")))).toBe(200);
+    const res = await withKey(`/jobs/${jobId}`);
+    const body = (await res.json()) as { applied_at: string | null; events: Array<{ to_status: string }> };
+    expect(body.applied_at).not.toBeNull();
+    expect(body.events.map((e) => e.to_status)).toEqual(["applied", "saved"]);
+  });
+
+  test("invalid body → 422", async () => {
+    expect(status(await withKey("/jobs", json({ ...job, job_url: "javascript:alert(1)" })))).toBe(422);
+    expect(status(await withKey("/jobs", json({ ...job, status: "hired" })))).toBe(422);
+  });
+
+  test("unknown sort column falls back to the default → 200", async () => {
+    expect(status(await withKey("/jobs?sort=;drop&order=sideways"))).toBe(200);
+  });
+
+  test("GET /jobs/stats counts the filtered jobs", async () => {
+    const res = await withKey("/jobs/stats?location=berlin");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { total: number; by_status: Record<string, number> };
+    expect(body.total).toBe(1);
+    expect(body.by_status.applied).toBe(1);
+  });
+
+  test("API key DELETE /jobs/:id → 403, owner session → 204", async () => {
+    expect(status(await withKey(`/jobs/${jobId}`, { method: "DELETE" }))).toBe(403);
+    expect(status(await withSession(`/jobs/${jobId}`, { method: "DELETE" }))).toBe(204);
+  });
+});

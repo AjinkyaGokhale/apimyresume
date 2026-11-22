@@ -1,0 +1,9 @@
+{
+  "id": "basic-resume",
+  "name": "Basic Resume",
+  "description": "Modern resume template based on https://github.com/stuxf/basic-typst-resume-template - clean, professional layout with ATS-friendly design",
+  "engine": "typst",
+  "paperSize": "us-letter",
+  "fonts": ["New Computer Modern"],
+  "typstPackages": []
+}

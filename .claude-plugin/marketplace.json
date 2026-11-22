@@ -1,0 +1,12 @@
+{
+  "name": "apimyresume",
+  "owner": { "name": "Ajinkya Gokhale" },
+  "description": "APIMyResume for Claude: resumes, cover letters and job tracking.",
+  "plugins": [
+    {
+      "name": "apimyresume",
+      "source": "./plugin",
+      "description": "Base resume, tailored PDF resumes and cover letters, and a job tracker, running locally inside Claude."
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 // dashboard/src/lib/api.ts
-import type { CoverLetter, Pagination, ResumeDto } from "$lib/types";
+import type { CoverLetter, JobDto, JobFilters, JobStats, Pagination, ResumeDto } from "$lib/types";
 
 /** Reads bootstrap config injected by the Hono server into index.html. Falls back to Vite env vars for local dev. */
 export function getApiKey(): string {
@@ -225,6 +225,29 @@ export interface CreateResumePayload {
 
 export const createResume = (payload: CreateResumePayload | Record<string, unknown>) =>
   api<ResumeDto>("/resumes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+
+// --- Job tracker ---------------------------------------------------------------
+
+/** Serialise job filters to a query string, skipping empty values. */
+export function jobQuery(f: JobFilters): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(f)) {
+    if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+    q.set(k, Array.isArray(v) ? v.join(",") : String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export const listJobs = (f: JobFilters = {}) =>
+  api<{ data: JobDto[]; pagination: Pagination }>(`/jobs${jobQuery(f)}`);
+export const getJobStats = (f: JobFilters = {}) => api<JobStats>(`/jobs/stats${jobQuery(f)}`);
+export const getJob = (id: string) => api<JobDto>(`/jobs/${id}`);
+export const createJob = (payload: Record<string, unknown>) =>
+  api<JobDto>("/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+export const updateJob = (id: string, payload: Record<string, unknown>) =>
+  api<JobDto>(`/jobs/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+export const deleteJob = (id: string) => api<void>(`/jobs/${id}`, { method: "DELETE" });
 
 /** Alias for getApiUrl — use for loading public PDFs and thumbnails. */
 export const getPublicApiUrl = getApiUrl;

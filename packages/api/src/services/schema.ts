@@ -1,4 +1,5 @@
 import { templateRegistry } from "../templates/registry.ts";
+import { JOB_STATUSES, WORK_MODES } from "../types/jobs.ts";
 
 /**
  * AI discovery schema (spec §17). Returns a draft-07 JSON Schema describing the
@@ -323,6 +324,117 @@ export function buildSchemaDocument() {
     },
   ];
 
+  // Job tracker — agents log applications here (typically right after creating
+  // a tailored child resume) and move them through the status pipeline.
+  const jobProperties = {
+    company: { type: "string", maxLength: 200, example: "Acme Corp" },
+    role: { type: "string", maxLength: 200, example: "Senior Backend Engineer" },
+    job_url: {
+      type: "string",
+      format: "uri",
+      description: "Posting URL (http/https). Upsert key: POSTing a known URL updates that job.",
+    },
+    location: { type: "string", maxLength: 200, example: "Berlin, DE" },
+    work_mode: { type: "string", enum: WORK_MODES },
+    status: { type: "string", enum: JOB_STATUSES, default: "saved" },
+    status_note: { type: "string", maxLength: 1000, description: "Note stored with this status change." },
+    source: { type: "string", maxLength: 100, example: "linkedin" },
+    salary_min: { type: "integer", minimum: 0 },
+    salary_max: { type: "integer", minimum: 0 },
+    salary_currency: { type: "string", pattern: "^[A-Za-z]{3}$", example: "EUR" },
+    match_score: { type: "integer", minimum: 0, maximum: 100, description: "Your fit score for this job." },
+    posted_at: { type: "string", format: "date" },
+    applied_at: {
+      type: "string",
+      format: "date",
+      description: "Set automatically the first time status becomes `applied`.",
+    },
+    resume_id: { type: "string", description: "Id of the tailored child resume sent with this application." },
+    tags: { type: "array", items: { type: "string", maxLength: 50 }, maxItems: 20 },
+    notes: { type: "string", maxLength: 10000 },
+  } as const;
+  const jobTools = [
+    {
+      name: "create_job",
+      description:
+        "Track a job application (POST /api/v1/jobs). Idempotent by job_url: re-sending a " +
+        "known URL merges the fields into the existing job (200) instead of creating a duplicate (201).",
+      parameters: { type: "object", properties: jobProperties, required: ["company", "role"], additionalProperties: false },
+      input_schema: { type: "object", properties: jobProperties, required: ["company", "role"], additionalProperties: false },
+    },
+    {
+      name: "update_job",
+      description:
+        "Update a tracked job (PATCH /api/v1/jobs/{id}) — typically to move its status. " +
+        "Every status change is recorded in the job's history.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "string" }, ...jobProperties },
+        required: ["id"],
+        additionalProperties: false,
+      },
+      input_schema: {
+        type: "object",
+        properties: { id: { type: "string" }, ...jobProperties },
+        required: ["id"],
+        additionalProperties: false,
+      },
+    },
+  ];
+
+  const jobEndpoints = [
+    {
+      method: "POST",
+      path: "/api/v1/jobs",
+      summary: "Create a tracked job, or update the existing one with the same job_url. 201 created / 200 updated.",
+      auth: "X-API-Key",
+      content_type: "application/json",
+      example: {
+        request: {
+          company: "Acme Corp",
+          role: "Senior Backend Engineer",
+          job_url: "https://acme.example/jobs/123",
+          location: "Berlin, DE",
+          work_mode: "hybrid",
+          status: "applied",
+          source: "linkedin",
+          resume_id: "resume_AbCdEf123456",
+        },
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/v1/jobs",
+      summary:
+        "List jobs. Filters: ?status=a,b ?company= ?location= ?work_mode= ?source= ?tag= ?q= " +
+        "?from=&to= (YYYY-MM-DD) with ?date_field=applied_at|created_at|posted_at|updated_at. " +
+        "Sort: ?sort=applied_at|created_at|updated_at|posted_at|company|status|match_score &order=asc|desc. " +
+        "Paginate with ?page= & ?limit= (max 100). Returns { data, pagination }.",
+      auth: "X-API-Key",
+    },
+    {
+      method: "GET",
+      path: "/api/v1/jobs/stats",
+      summary: "Funnel, rates, timeline and breakdowns for the jobs matching the same filters as the list.",
+      auth: "X-API-Key",
+    },
+    { method: "GET", path: "/api/v1/jobs/{id}", summary: "Read one job with its status history (`events`).", auth: "X-API-Key" },
+    {
+      method: "PATCH",
+      path: "/api/v1/jobs/{id}",
+      summary: "Update any job fields. Changing `status` records a history event (optional `status_note`).",
+      auth: "X-API-Key",
+      content_type: "application/json",
+      example: { request: { status: "interviewing", status_note: "Recruiter call booked" } },
+    },
+    {
+      method: "DELETE",
+      path: "/api/v1/jobs/{id}",
+      summary: "Delete a job and its history. Owner only — agents should set status `withdrawn` instead. Returns 204.",
+      auth: "Owner only",
+    },
+  ];
+
   return {
     name: "create_resume",
     description:
@@ -340,6 +452,9 @@ export function buildSchemaDocument() {
     endpoints: baseEndpoints,
     // Human-readable reference for the child-resume lifecycle (the API surface).
     child_endpoints: childEndpoints,
+    // Job tracker: tool definitions + endpoint reference.
+    job_tools: jobTools,
+    job_endpoints: jobEndpoints,
     // Normalizer aliases (spec §17, Appendix D):
     "x-aliases": {
       "overrides.keywords": ["keywords", "key_skills", "skills", "highlight_skills"],

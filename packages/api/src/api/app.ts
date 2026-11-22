@@ -18,6 +18,7 @@ import { templates } from "./routes/templates.ts";
 import { misc } from "./routes/misc.ts";
 import { apiKeysRouter } from "./routes/apikeys.ts";
 import { authRouter } from "./routes/auth.ts";
+import { jobsRouter } from "./routes/jobs.ts";
 
 /**
  * Hono application (spec §1, §18, §19). Wires the v1 API behind API-key auth
@@ -108,6 +109,7 @@ export function createApp() {
   v1.route("/bases", bases);
   v1.route("/resumes", resumes);
   v1.route("/api-keys", apiKeysRouter);
+  v1.route("/jobs", jobsRouter);
   app.route("/api/v1", v1);
 
   // --- Dashboard static file serving ---

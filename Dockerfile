@@ -1,4 +1,4 @@
-FROM oven/bun:1.3 AS dashboard-builder
+FROM oven/bun:1.4 AS dashboard-builder
 WORKDIR /dashboard
 COPY packages/dashboard/package.json packages/dashboard/bun.lock* ./
 RUN bun install --frozen-lockfile
@@ -8,7 +8,7 @@ ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 RUN bun run build
 
-FROM oven/bun:1.3 AS base
+FROM oven/bun:1.4 AS base
 WORKDIR /app
 
 # --- Typst CLI binary ---
@@ -62,6 +62,6 @@ EXPOSE 3000
 VOLUME ["/data", "/app/templates"]
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s \
-  CMD bun -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD ["bun", "-e", "fetch('http://localhost:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 CMD ["bun", "run", "src/index.ts"]

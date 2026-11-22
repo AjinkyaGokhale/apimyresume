@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if ! command -v bun >/dev/null 2>&1; then echo 'APIMyResume plugin: Bun is not installed, so its resume tools are unavailable. Install it with `npm install -g bun` (or `curl -fsSL https://bun.sh/install | bash`), then run /mcp to reconnect the apimyresume server.'; elif [ ! -d \"${CLAUDE_PLUGIN_ROOT}/node_modules/@myriaddreamin\" ]; then (cd \"${CLAUDE_PLUGIN_ROOT}\" && bun install --production --frozen-lockfile >/dev/null 2>&1) && echo 'APIMyResume plugin: installed the PDF renderer. If its tools are missing, run /mcp to reconnect the apimyresume server.'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
