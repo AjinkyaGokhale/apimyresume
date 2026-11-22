@@ -35,6 +35,7 @@
   // Resumes browsing (overview + inside a base folder) keeps the nav highlighted
   // and the constrained content width.
   const onResumes = $derived($page.url.pathname === "/" || $page.url.pathname.startsWith("/base/"));
+  const onJobs = $derived($page.url.pathname === "/jobs");
   const onDocs = $derived($page.url.pathname === "/docs");
   const onApiKeys = $derived($page.url.pathname === "/api-keys");
   const onAuth = $derived($page.url.pathname === "/authentication");
@@ -82,6 +83,10 @@
         <Icon name="file-text" size={17} />
         <span class="label">Resumes</span>
         <span class="count">{data.total}</span>
+      </a>
+      <a class="nav-item" class:active={onJobs} href="/jobs" onclick={close}>
+        <Icon name="briefcase" size={17} />
+        <span class="label">Job tracker</span>
       </a>
       <a class="nav-item" class:active={onDocs} href="/docs" onclick={close}>
         <Icon name="book-open" size={17} />

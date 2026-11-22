@@ -101,6 +101,63 @@ export const sessions = sqliteTable("sessions", {
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
 });
 
+/** A tracked job application — written by AI agents (API key) or the owner. */
+export const jobs = sqliteTable(
+  "jobs",
+  {
+    id: text("id").primaryKey(),
+    company: text("company").notNull(),
+    role: text("role").notNull(),
+    /** Posting URL — the upsert key, so agents can safely re-POST the same job. */
+    jobUrl: text("job_url").unique(),
+    location: text("location"),
+    workMode: text("work_mode"),
+    status: text("status").notNull().default("saved"),
+    source: text("source"),
+    salaryMin: integer("salary_min"),
+    salaryMax: integer("salary_max"),
+    salaryCurrency: text("salary_currency"),
+    matchScore: integer("match_score"),
+    postedAt: text("posted_at"),
+    appliedAt: text("applied_at"),
+    /** Optional tailored resume sent with this application. */
+    resumeId: text("resume_id").references(() => resumes.id, { onDelete: "set null" }),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    notes: text("notes"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+  },
+  (t) => ({
+    statusIdx: index("jobs_status_idx").on(t.status),
+    appliedAtIdx: index("jobs_applied_at_idx").on(t.appliedAt),
+    companyIdx: index("jobs_company_idx").on(t.company),
+  }),
+);
+
+/** Status history for a job — one row per status change. */
+export const jobEvents = sqliteTable(
+  "job_events",
+  {
+    id: text("id").primaryKey(),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    note: text("note"),
+    /** How the change was made: "apikey" (agent) or "session" (owner). */
+    actor: text("actor").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+  },
+  (t) => ({ jobIdx: index("job_events_job_idx").on(t.jobId) }),
+);
+
 export type ApiKeyRow = typeof apiKeys.$inferSelect;
 export type NewApiKeyRow = typeof apiKeys.$inferInsert;
 export type UserRow = typeof users.$inferSelect;
@@ -112,3 +169,7 @@ export type BaseRow = typeof bases.$inferSelect;
 export type NewBaseRow = typeof bases.$inferInsert;
 export type ResumeRow = typeof resumes.$inferSelect;
 export type NewResumeRow = typeof resumes.$inferInsert;
+export type JobRow = typeof jobs.$inferSelect;
+export type NewJobRow = typeof jobs.$inferInsert;
+export type JobEventRow = typeof jobEvents.$inferSelect;
+export type NewJobEventRow = typeof jobEvents.$inferInsert;

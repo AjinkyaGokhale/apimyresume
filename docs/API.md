@@ -15,6 +15,7 @@ builds on them.
   - [Download the PDF](#download-the-pdf)
 - [Cover letters](#cover-letters)
 - [Reading the base resume](#reading-the-base-resume)
+- [Job tracker](#job-tracker)
 - [Use it with n8n / AI agents](#use-it-with-n8n--ai-agents)
 - [API keys](#api-keys)
 - [Full schema (machine-readable)](#full-schema-machine-readable)
@@ -368,6 +369,80 @@ curl http://localhost:3000/api/v1/bases/{id} -H "X-API-Key: your-key"
 
 ---
 
+## Job tracker
+
+Keep track of every job you apply to. Agents log applications here (usually right after
+creating a tailored resume) and move them through the pipeline; the dashboard's **Job tracker**
+page shows them with filters, sorting and metrics.
+
+**Statuses:** `saved` → `applied` → `screening` → `interviewing` → `offer` → `accepted`,
+plus `rejected`, `withdrawn` and `ghosted`. Every status change is saved in the job's history.
+
+### Add a job
+
+Only `company` and `role` are required.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/jobs \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company": "Acme Corp",
+    "role": "Senior Backend Engineer",
+    "job_url": "https://acme.example/jobs/123",
+    "location": "Berlin, DE",
+    "work_mode": "hybrid",
+    "status": "applied",
+    "source": "linkedin",
+    "match_score": 82,
+    "resume_id": "resume_xxx"
+  }'
+
+# → 201 { "id": "job_xxx", "status": "applied", "applied_at": "2026-10-24", ... }
+```
+
+> **No duplicates:** `job_url` is the job's identity. POSTing a URL that's already tracked
+> updates that job and returns `200` with the same `id`, so an agent can safely retry.
+
+Other optional fields: `salary_min`, `salary_max`, `salary_currency` (e.g. `EUR`), `posted_at`,
+`applied_at` (YYYY-MM-DD), `tags`, `notes`. Unknown fields are rejected with `422`.
+
+### Update a job
+
+```bash
+curl -X PATCH http://localhost:3000/api/v1/jobs/job_xxx \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "interviewing", "status_note": "Recruiter call booked" }'
+```
+
+The first time a job becomes `applied`, `applied_at` is set to today unless you send it.
+
+### List, read, stats, delete
+
+```bash
+# Filter, sort and page through jobs
+curl "http://localhost:3000/api/v1/jobs?status=applied,interviewing&location=berlin&from=2026-10-01&sort=applied_at&order=desc" \
+  -H "X-API-Key: your-key"
+
+# One job, with its status history under "events"
+curl http://localhost:3000/api/v1/jobs/job_xxx -H "X-API-Key: your-key"
+
+# Metrics (funnel, response/interview/offer rates, weekly timeline, top locations)
+# — takes the same filters as the list
+curl "http://localhost:3000/api/v1/jobs/stats?from=2026-01-01" -H "X-API-Key: your-key"
+```
+
+List filters: `status` (comma-separated), `company`, `location`, `q` (searches company, role,
+location and notes), `work_mode`, `source`, `tag`, `from` / `to` with `date_field`
+(`applied_at` by default, or `created_at`, `posted_at`, `updated_at`). Sort with `sort` +
+`order`; paginate with `page` + `limit` (max 100).
+
+Deleting a job (`DELETE /api/v1/jobs/{id}`) is an **owner action** in the dashboard. Agents
+get `403 owner_only`; they should set the status to `withdrawn` instead.
+
+---
+
 ## Use it with n8n / AI agents
 
 APIMyResume is built for automation. The usual flow:
@@ -383,6 +458,8 @@ APIMyResume is built for automation. The usual flow:
    `GET /api/v1/resumes/{id}/cover-letter/pdf` for the letter PDF.
 5. **(Optional) Refine it later** → `PATCH /api/v1/resumes/{id}`
    A new PDF version is rendered.
+6. **Track the application** → `POST /api/v1/jobs` with the `resume_id`
+   Later, `PATCH /api/v1/jobs/{id}` as the status changes. See [Job tracker](#job-tracker).
 
 > Your base is never touched by automation. Creating or editing a base is an owner action in
 > the dashboard and returns `403 owner_only` for API keys — so an agent can experiment freely

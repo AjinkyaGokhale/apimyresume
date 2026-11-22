@@ -120,6 +120,46 @@ export function migrate(): void {
     );
   `);
 
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS jobs (
+      id              TEXT PRIMARY KEY,
+      company         TEXT NOT NULL,
+      role            TEXT NOT NULL,
+      job_url         TEXT UNIQUE,
+      location        TEXT,
+      work_mode       TEXT,
+      status          TEXT NOT NULL DEFAULT 'saved',
+      source          TEXT,
+      salary_min      INTEGER,
+      salary_max      INTEGER,
+      salary_currency TEXT,
+      match_score     INTEGER,
+      posted_at       TEXT,
+      applied_at      TEXT,
+      resume_id       TEXT REFERENCES resumes(id) ON DELETE SET NULL,
+      tags            TEXT NOT NULL DEFAULT '[]',
+      notes           TEXT,
+      created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs(status);
+    CREATE INDEX IF NOT EXISTS jobs_applied_at_idx ON jobs(applied_at);
+    CREATE INDEX IF NOT EXISTS jobs_company_idx ON jobs(company);
+
+    CREATE TABLE IF NOT EXISTS job_events (
+      id          TEXT PRIMARY KEY,
+      job_id      TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      from_status TEXT,
+      to_status   TEXT NOT NULL,
+      note        TEXT,
+      actor       TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS job_events_job_idx ON job_events(job_id);
+  `);
+
   log.info("Database schema ready", { db: sqlite.filename });
 }
 
