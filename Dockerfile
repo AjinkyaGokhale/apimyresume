@@ -62,6 +62,6 @@ EXPOSE 3000
 VOLUME ["/data", "/app/templates"]
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s \
-  CMD bun -e "fetch('http://localhost:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD ["bun", "-e", "fetch('http://localhost:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 CMD ["bun", "run", "src/index.ts"]
