@@ -341,6 +341,9 @@
   #for cat in ctx.skills.data [
     *#cat.at("category", default: "")*: #cat.at("items", default: ()).join(", ") \
   ]
+  // Close the section with the same air the other sections leave, so the next
+  // heading does not sit tight against the last skills line.
+  #v(6pt)
 ]
 
 #let render-certifications() = [
