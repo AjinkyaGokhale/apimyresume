@@ -39,6 +39,9 @@ export const experienceRoleSchema = z.object({
   role: z.string(),
   period: z.string(),
   current: z.boolean().optional(),
+  // Optional link for the role (e.g. a thesis repository); templates that
+  // support it render the role title as a clickable link.
+  url: z.string().optional(),
   bullets: z.array(z.string()).default([]),
 });
 
@@ -58,6 +61,8 @@ export const experienceSchema = z
     location: z.string().optional(),
     period: z.string().optional(),
     current: z.boolean().optional(),
+    // Optional link for a flat entry; see `url` on a role.
+    url: z.string().optional(),
     bullets: z.array(z.string()).default([]),
     tags: z.array(z.string()).optional(),
     roles: z.array(experienceRoleSchema).optional(),
